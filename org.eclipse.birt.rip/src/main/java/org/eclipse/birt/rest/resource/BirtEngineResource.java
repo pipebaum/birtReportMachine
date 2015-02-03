@@ -3,7 +3,6 @@ package org.eclipse.birt.rest.resource;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -113,60 +112,47 @@ public class BirtEngineResource {
 		}
 		// jsonObject holds the report parameters, if any
 		final File file = new File(resourceDir, fileIdString);
-		final UUID outputFileId = UUID.randomUUID();
-		final File outputFile = new File(resourceDir, outputFileId.toString()
-				+ "." + outputFormat);
-		FileOutputStream fos;
-		try {
-			fos = new FileOutputStream(outputFile);
-		} catch (final FileNotFoundException e) {
-			throw new ServerErrorException(500, e);
-		}
-		IReportEngine reportEngine;
-		reportEngine = ReportEngine.getReportEngine();
-		IRunAndRenderTask runTask;
-		try {
-			final FileInputStream fis = new FileInputStream(file);
-			final IReportRunnable design = reportEngine.openReportDesign(fis);
-			runTask = reportEngine.createRunAndRenderTask(design);
-			runTask.validateParameters();
-			final RenderOption options = new HTMLRenderOption();
-			options.setOutputFormat(outputFormat);
-			options.setOutputStream(fos);
-			runTask.setRenderOption(options);
-			runTask.run();
-			fos.close();
-		} catch (final FileNotFoundException e) {
-			throw new NotFoundException(e);
-		} catch (final IOException e) {
-			throw new ServerErrorException(500, e);
-		} catch (final EngineException e) {
-			throw new ServerErrorException(500, e);
-		}
-		@SuppressWarnings("unchecked")
-		final List<EngineException> errors = runTask.getErrors();
-		for (final EngineException engineException : errors) {
-			System.out.println("ERROR:\t" + engineException.getMessage());
-		}
-		if (!errors.isEmpty())
-			throw new ServerErrorException(errors.size()
-					+ " error(s) encountered.  See log for details.", 500);
 		return new StreamingOutput() {
 
 			@Override
 			public void write(final OutputStream output) throws IOException,
 					WebApplicationException {
-				final FileInputStream fis = new FileInputStream(outputFile);
+				IReportEngine reportEngine;
+				reportEngine = ReportEngine.getReportEngine();
+				IRunAndRenderTask runTask;
 				try {
-					final byte[] buffer = new byte[0x1000];
-					int bytesRead = fis.read(buffer);
-					while (bytesRead >= 0) {
-						output.write(buffer, 0, bytesRead);
-						bytesRead = fis.read(buffer);
-					}
-				} finally {
-					fis.close();
+					final FileInputStream fis = new FileInputStream(file);
+					final IReportRunnable design = reportEngine
+							.openReportDesign(fis);
+					runTask = reportEngine.createRunAndRenderTask(design);
+					runTask.validateParameters();
+					final RenderOption options = new HTMLRenderOption();
+					options.setOutputFormat(outputFormat);
+					options.setOutputStream(output);
+					runTask.setRenderOption(options);
+					runTask.run();
+				} catch (final FileNotFoundException e) {
+					throw new NotFoundException(e);
+				} catch (final EngineException e) {
+					throw new ServerErrorException(500, e);
 				}
+				@SuppressWarnings("unchecked")
+				final List<EngineException> errors = runTask.getErrors();
+				for (final EngineException engineException : errors) {
+					System.out.println("ERROR:\t"
+							+ engineException.getMessage());
+				}
+				if (!errors.isEmpty())
+					throw new ServerErrorException(errors.size()
+							+ " error(s) encountered.  See log for details.",
+							500);
+				/*
+				 * final FileInputStream fis = new FileInputStream(outputFile);
+				 * try { final byte[] buffer = new byte[0x1000]; int bytesRead =
+				 * fis.read(buffer); while (bytesRead >= 0) {
+				 * output.write(buffer, 0, bytesRead); bytesRead =
+				 * fis.read(buffer); } } finally { fis.close(); }
+				 */
 			}
 		};
 	}
