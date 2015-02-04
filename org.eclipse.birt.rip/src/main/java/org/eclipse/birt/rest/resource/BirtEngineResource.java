@@ -40,44 +40,6 @@ import org.eclipse.birt.report.engine.api.RenderOption;
 
 @Path("run")
 public class BirtEngineResource {
-	private final File resourceDir;
-	private final Map<UUID, Long> files = new HashMap<>();
-	private final Thread terminator;
-	private final long timeToLive; // ten minutes
-
-	public BirtEngineResource() {
-		final Properties properties = System.getProperties();
-		// resource dir: where to put files, required
-		final String resourceDirName = properties
-				.getProperty("org.eclipse.birt.rip.resource.dir");
-		if (resourceDirName == null)
-			throw new NullPointerException(
-					"property: org.eclipse.birt.rip.resource.dir");
-		resourceDir = new File(resourceDirName);
-		purgeResourceDir();
-		// time-to-live: how long to keep files with no activity (in ms),
-		// defaults to ten minutes
-		final String ttlString = properties
-				.getProperty("org.eclipse.birt.rip.file.ttl");
-		timeToLive = ttlString == null ? 10 * 60 * 1000 : Long
-				.valueOf(ttlString);
-		// terminator thread deletes files when they get old enough
-		final Runnable runnable = new TerminatorRunnable();
-		terminator = new Thread(runnable, "terminator");
-		terminator.start();
-	}
-
-	private final void purgeResourceDir() {
-		final File[] files = resourceDir.listFiles();
-		if (files == null)
-			return;
-		for (final File file : files) {
-			if (file.isDirectory())
-				continue;
-			// there shouldn't be any directories, but if there are, ignore them
-			file.delete();
-		}
-	}
 
 	private static class FileInfo {
 		public final UUID uuid;
@@ -91,10 +53,10 @@ public class BirtEngineResource {
 		}
 	}
 
-	private List<FileInfo> getFileInfoList() {
+	private static List<FileInfo> getFileInfoList() {
 		final List<FileInfo> list = new ArrayList<>();
-		for (final UUID uuid : files.keySet()) {
-			Long endTime = files.get(uuid);
+		for (final UUID uuid : FILES.keySet()) {
+			Long endTime = FILES.get(uuid);
 			if (endTime == null)
 				endTime = Long.valueOf(0);
 			list.add(new FileInfo(uuid, endTime.longValue()));
@@ -111,14 +73,14 @@ public class BirtEngineResource {
 		return list;
 	}
 
-	private void deleteFile(final UUID uuid) {
+	private static void deleteFile(final UUID uuid) {
 		System.out.println("deleting file " + uuid);
-		files.remove(uuid);
-		final File file = new File(resourceDir, uuid.toString());
+		FILES.remove(uuid);
+		final File file = new File(RESOURCE_DIR, uuid.toString());
 		file.delete();
 	}
 
-	private class TerminatorRunnable implements Runnable {
+	private static class TerminatorRunnable implements Runnable {
 		private long sleepTime = Long.MAX_VALUE;
 
 		@Override
@@ -156,8 +118,8 @@ public class BirtEngineResource {
 	@Produces({ MediaType.APPLICATION_JSON })
 	public String uploadReport(final java.io.Reader reader) throws IOException {
 		final UUID uuid = UUID.randomUUID();
-		resourceDir.mkdirs();
-		final File file = new File(resourceDir, uuid.toString());
+		RESOURCE_DIR.mkdirs();
+		final File file = new File(RESOURCE_DIR, uuid.toString());
 		final FileWriter writer = new FileWriter(file);
 		try {
 			final char[] buffer = new char[0x1000];
@@ -170,9 +132,9 @@ public class BirtEngineResource {
 			writer.close();
 		}
 		System.out.println("adding file " + uuid);
-		final long endTime = System.currentTimeMillis() + timeToLive;
-		files.put(uuid, Long.valueOf(endTime));
-		terminator.interrupt();
+		final long endTime = System.currentTimeMillis() + TIME_TO_LIVE;
+		FILES.put(uuid, Long.valueOf(endTime));
+		TERMINATOR.interrupt();
 		final Map<String, Object> outputMap = new HashMap<>();
 		outputMap.put("fileId", uuid.toString());
 		final JSONObject jsonObject = JSONObject.fromObject(outputMap);
@@ -185,7 +147,7 @@ public class BirtEngineResource {
 	@Produces({ MediaType.APPLICATION_OCTET_STREAM })
 	public StreamingOutput downloadReport(
 			@PathParam("fileId") final String fileIdString) {
-		final File file = new File(resourceDir, fileIdString);
+		final File file = new File(RESOURCE_DIR, fileIdString);
 		return new StreamingOutput() {
 
 			@Override
@@ -219,7 +181,7 @@ public class BirtEngineResource {
 			System.out.println(object);
 		}
 		// jsonObject holds the report parameters, if any
-		final File file = new File(resourceDir, fileIdString);
+		final File file = new File(RESOURCE_DIR, fileIdString);
 		final StreamingOutput entity = new StreamingOutput() {
 
 			@Override
@@ -273,8 +235,7 @@ public class BirtEngineResource {
 		return "application/octet-stream";
 	}
 
-	private static final Map<String, String> MIME_TYPES = new HashMap<>();
-	static {
+	private static void initializeMediaTypes() {
 		MIME_TYPES.put("html", "text/html");
 		MIME_TYPES.put("pdf", "application/pdf");
 		// see http://filext.com/faq/office_mime_types.php
@@ -328,5 +289,45 @@ public class BirtEngineResource {
 				"application/vnd.ms-powerpoint.template.macroEnabled.12");
 		MIME_TYPES.put("ppsm",
 				"application/vnd.ms-powerpoint.slideshow.macroEnabled.12");
+	}
+
+	private static void purgeResourceDir() {
+		final File[] files = RESOURCE_DIR.listFiles();
+		if (files == null)
+			return;
+		for (final File file : files) {
+			if (file.isDirectory())
+				continue;
+			// there shouldn't be any directories, but if there are, ignore them
+			file.delete();
+		}
+	}
+
+	private static final Map<String, String> MIME_TYPES = new HashMap<>();
+	private static final File RESOURCE_DIR;
+	private static final Map<UUID, Long> FILES = new HashMap<>();
+	private static final Thread TERMINATOR;
+	private static final long TIME_TO_LIVE; // ten minutes
+	static {
+		initializeMediaTypes();
+		final Properties properties = System.getProperties();
+		// resource dir: where to put files, required
+		final String resourceDirName = properties
+				.getProperty("org.eclipse.birt.rip.resource.dir");
+		if (resourceDirName == null)
+			throw new NullPointerException(
+					"property: org.eclipse.birt.rip.resource.dir");
+		RESOURCE_DIR = new File(resourceDirName);
+		purgeResourceDir();
+		// time-to-live: how long to keep files with no activity (in ms),
+		// defaults to ten minutes
+		final String ttlString = properties
+				.getProperty("org.eclipse.birt.rip.file.ttl");
+		TIME_TO_LIVE = ttlString == null ? 10 * 60 * 1000 : Long
+				.valueOf(ttlString);
+		// terminator thread deletes files when they get old enough
+		final Runnable runnable = new TerminatorRunnable();
+		TERMINATOR = new Thread(runnable, "terminator");
+		TERMINATOR.start();
 	}
 }
