@@ -327,13 +327,8 @@ public class BirtEngineResource {
 	public Response runReport(final String inputJsonString,
 			@PathParam("outputFormat") final String outputFormat,
 			@PathParam("fileId") final String fileIdString) {
-		final JSONObject jsonObject = JSONObject.fromString(inputJsonString);
-		final Iterator<?> iterator = jsonObject.keys();
-		while (iterator.hasNext()) {
-			final Object object = iterator.next();
-			System.out.println(object);
-		}
-		// jsonObject holds the report parameters, if any
+		final JSONObject paramsJsonObject = JSONObject
+				.fromString(inputJsonString);
 		final File file = new File(RESOURCE_DIR, fileIdString);
 		final StreamingOutput entity = new StreamingOutput() {
 
@@ -348,6 +343,16 @@ public class BirtEngineResource {
 					final IReportRunnable design = reportEngine
 							.openReportDesign(fis);
 					runTask = reportEngine.createRunAndRenderTask(design);
+					final Iterator<?> iterator = paramsJsonObject.keys();
+					while (iterator.hasNext()) {
+						final Object object = iterator.next();
+						if (object instanceof String) {
+							final String paramName = (String) object;
+							final Object paramValue = paramsJsonObject
+									.get(paramName);
+							runTask.setParameterValue(paramName, paramValue);
+						}
+					}
 					runTask.validateParameters();
 					final RenderOption options = new HTMLRenderOption();
 					options.setOutputFormat(outputFormat);

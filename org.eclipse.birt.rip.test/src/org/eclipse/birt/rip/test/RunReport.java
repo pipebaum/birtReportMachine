@@ -11,6 +11,7 @@ public class RunReport {
 	public static void main(final String[] args) throws IOException {
 		final String fileIdString = args[0];
 		final String mimeType = args[1];
+		final String params = args[2];
 		final URL url = new URL(
 				"http://localhost:8080/org.eclipse.birt.rip/birt/run/report/run/"
 						+ mimeType + "/" + fileIdString);
@@ -21,7 +22,7 @@ public class RunReport {
 		connection.setRequestProperty("Content-Type", "application/json");
 		final OutputStream outputStream = connection.getOutputStream();
 		try {
-			final byte[] outputBytes = "{}".getBytes();
+			final byte[] outputBytes = params.getBytes();
 			outputStream.write(outputBytes);
 		} finally {
 			outputStream.close();
