@@ -1,16 +1,41 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <report xmlns="http://www.eclipse.org/birt/2005/design" version="3.2.23" id="1">
-    <property name="createdBy">Eclipse BIRT Designer Version 4.2.3.v20131216-0430 Build &lt;4.2.3.v20131216-0430></property>
+    <property name="createdBy">Eclipse BIRT Designer Version 4.4.1.v201408290142 Build &lt;4.4.1.v20140916-1320></property>
     <property name="units">in</property>
     <property name="iconFile">/templates/blank_report.gif</property>
     <property name="bidiLayoutOrientation">ltr</property>
     <property name="imageDPI">96</property>
-    <list-property name="libraries">
-        <structure>
-            <property name="fileName">/ThemesReportItems3.rptlibrary</property>
-            <property name="namespace">ThemesReportItems3</property>
-        </structure>
-    </list-property>
+    <parameters>
+        <scalar-parameter name="debug" id="25">
+            <property name="valueType">static</property>
+            <property name="isRequired">false</property>
+            <property name="dataType">boolean</property>
+            <property name="distinct">true</property>
+            <simple-property-list name="defaultValue">
+                <value type="constant">False</value>
+            </simple-property-list>
+            <list-property name="selectionList"/>
+            <property name="paramType">simple</property>
+            <property name="controlType">check-box</property>
+            <structure name="format"/>
+        </scalar-parameter>
+        <scalar-parameter name="rowCount" id="26">
+            <text-property name="promptText">Row count</text-property>
+            <property name="valueType">static</property>
+            <property name="isRequired">false</property>
+            <property name="dataType">integer</property>
+            <property name="distinct">true</property>
+            <simple-property-list name="defaultValue">
+                <value type="constant">10</value>
+            </simple-property-list>
+            <list-property name="selectionList"/>
+            <property name="paramType">simple</property>
+            <property name="controlType">text-box</property>
+            <structure name="format">
+                <property name="category">Unformatted</property>
+            </structure>
+        </scalar-parameter>
+    </parameters>
     <data-sources>
         <script-data-source name="srcScript" id="7"/>
     </data-sources>
@@ -32,12 +57,10 @@
                 <structure>
                     <property name="columnName">number</property>
                     <property name="analysis">measure</property>
-                    <text-property name="displayName" key=""></text-property>
                 </structure>
                 <structure>
                     <property name="columnName">name</property>
                     <property name="analysis">dimension</property>
-                    <text-property name="displayName" key=""></text-property>
                 </structure>
             </list-property>
             <structure name="cachedMetaData">
@@ -57,7 +80,7 @@
             <property name="dataSource">srcScript</property>
             <method name="open"><![CDATA[cnt = 0;
 ]]></method>
-            <method name="fetch"><![CDATA[if (cnt < 10) {
+            <method name="fetch"><![CDATA[if (cnt < params["rowCount"].value) {
 	cnt++
 	row.number = cnt;
 	row.name = "Name_" + cnt;
@@ -114,7 +137,6 @@ return false]]></method>
         <table id="9">
             <property name="width">3.3125in</property>
             <property name="dataSet">setScript</property>
-            <property name="theme">ThemesReportItems3.Modern Table</property>
             <list-property name="boundDataColumns">
                 <structure>
                     <property name="name">number</property>

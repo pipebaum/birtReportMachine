@@ -7,6 +7,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -28,14 +29,19 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.StreamingOutput;
 
+import net.sf.json.JSONArray;
 import net.sf.json.JSONObject;
 
 import org.eclipse.birt.engine.ReportEngine;
 import org.eclipse.birt.report.engine.api.EngineException;
 import org.eclipse.birt.report.engine.api.HTMLRenderOption;
+import org.eclipse.birt.report.engine.api.IGetParameterDefinitionTask;
+import org.eclipse.birt.report.engine.api.IParameterDefn;
+import org.eclipse.birt.report.engine.api.IParameterDefnBase;
 import org.eclipse.birt.report.engine.api.IReportEngine;
 import org.eclipse.birt.report.engine.api.IReportRunnable;
 import org.eclipse.birt.report.engine.api.IRunAndRenderTask;
+import org.eclipse.birt.report.engine.api.IScalarParameterDefn;
 import org.eclipse.birt.report.engine.api.RenderOption;
 
 @Path("run")
@@ -81,24 +87,27 @@ public class BirtEngineResource {
 	}
 
 	private static class TerminatorRunnable implements Runnable {
-		private long sleepTime = Long.MAX_VALUE;
 
 		@Override
 		public void run() {
+			long sleepTime = Long.MAX_VALUE;
+			System.out.println("sleeping until interrupted");
 			while (true) {
-				try {
-					Thread.sleep(sleepTime);
-				} catch (final InterruptedException e) {
-					// interrupted when a new file is added
-				}
+				if (sleepTime > 0)
+					try {
+						Thread.sleep(sleepTime);
+					} catch (final InterruptedException e) {
+						// interrupted when a new file is added
+					}
 				final List<FileInfo> list = getFileInfoList();
 				if (list.isEmpty()) {
 					sleepTime = Long.MAX_VALUE;
+					System.out.println("sleeping until interrupted");
 					continue;
 				}
 				long nextEndTime = 0;
 				for (final FileInfo fileInfo : list) {
-					if (fileInfo.endTime < System.currentTimeMillis()) {
+					if (fileInfo.endTime <= System.currentTimeMillis()) {
 						deleteFile(fileInfo.uuid);
 						continue;
 					}
@@ -106,8 +115,8 @@ public class BirtEngineResource {
 					break;
 				}
 				sleepTime = nextEndTime - System.currentTimeMillis();
-				System.out.println("setting sleep time to "
-						+ (sleepTime / 1000.0) + " seconds");
+				System.out.println("sleeping " + (sleepTime / 1000.0)
+						+ " seconds");
 			}
 		}
 	}
@@ -164,8 +173,152 @@ public class BirtEngineResource {
 				} finally {
 					fis.close();
 				}
+				// reset the timer
+				FILES.put(UUID.fromString(fileIdString),
+						Long.valueOf(System.currentTimeMillis() + TIME_TO_LIVE));
 			}
 		};
+	}
+
+	@GET
+	@Path("/report/parameters/{fileId}")
+	@Produces({ MediaType.APPLICATION_JSON })
+	public String getParameters(@PathParam("fileId") final String fileIdString)
+			throws IOException, EngineException {
+		final File file = new File(RESOURCE_DIR, fileIdString);
+		final FileInputStream fis = new FileInputStream(file);
+		final IReportEngine reportEngine = ReportEngine.getReportEngine();
+		final IReportRunnable design = reportEngine.openReportDesign(fis);
+		final IGetParameterDefinitionTask task = reportEngine
+				.createGetParameterDefinitionTask(design);
+		try {
+			@SuppressWarnings("unchecked")
+			final Collection<Object> parameterDefns = task
+					.getParameterDefns(true);
+			final JSONArray jsonArray = new JSONArray();
+			for (final Object object : parameterDefns) {
+				if (!(object instanceof IScalarParameterDefn)) {
+					// only support scalar parameters for now
+					continue;
+				}
+				final IScalarParameterDefn parameterDefn = (IScalarParameterDefn) object;
+				final Map<String, Object> map = new HashMap<>();
+				map.put("name", parameterDefn.getName());
+				map.put("displayName", parameterDefn.getDisplayName());
+				map.put("helpText", parameterDefn.getHelpText());
+				final int birtParamType = parameterDefn.getParameterType();
+				final String type;
+				switch (birtParamType) {
+				case IParameterDefnBase.FILTER_PARAMETER:
+					type = "filter";
+					break;
+				case IParameterDefnBase.LIST_PARAMETER:
+					type = "list";
+					break;
+				case IParameterDefnBase.TABLE_PARAMETER:
+					type = "table";
+					break;
+				case IParameterDefnBase.PARAMETER_GROUP:
+					type = "parameter-group";
+					break;
+				case IParameterDefnBase.CASCADING_PARAMETER_GROUP:
+					type = "cascading-parameter-group";
+					break;
+				case IParameterDefnBase.SCALAR_PARAMETER:
+				default:
+					type = "scalar";
+				}
+				map.put("type", type);
+				// type should be SCALAR
+				map.put("promptText", parameterDefn.getPromptText());
+				final int birtDataType = parameterDefn.getDataType();
+				final String dataType;
+				switch (birtDataType) {
+				case IParameterDefn.TYPE_STRING:
+					dataType = "string";
+					break;
+				case IParameterDefn.TYPE_FLOAT:
+					dataType = "float";
+					break;
+				case IParameterDefn.TYPE_DECIMAL:
+					dataType = "decimal";
+					break;
+				case IParameterDefn.TYPE_DATE_TIME:
+					dataType = "date-time";
+					break;
+				case IParameterDefn.TYPE_BOOLEAN:
+					dataType = "boolean";
+					break;
+				case IParameterDefn.TYPE_INTEGER:
+					dataType = "integer";
+					break;
+				case IParameterDefn.TYPE_DATE:
+					dataType = "date";
+					break;
+				case IParameterDefn.TYPE_TIME:
+					dataType = "time";
+					break;
+				case IParameterDefn.TYPE_ANY:
+				default:
+					dataType = "any";
+				}
+				map.put("dataType", dataType);
+				map.put("hidden", parameterDefn.isHidden());
+				map.put("required", parameterDefn.isRequired());
+				map.put("allowNewValues", parameterDefn.allowNewValues());
+				map.put("displayInFixedOrder",
+						parameterDefn.displayInFixedOrder());
+				map.put("valueConcealed", parameterDefn.isValueConcealed());
+				map.put("displayFormat", parameterDefn.getDisplayFormat());
+				final String controlType;
+				switch (parameterDefn.getControlType()) {
+				case IScalarParameterDefn.LIST_BOX:
+					controlType = "list-box";
+					break;
+				case IScalarParameterDefn.RADIO_BUTTON:
+					controlType = "radio-button";
+					break;
+				case IScalarParameterDefn.CHECK_BOX:
+					controlType = "check-box";
+					break;
+				case IScalarParameterDefn.AUTO_SUGGEST:
+					controlType = "auto-suggest";
+					break;
+				case IScalarParameterDefn.TEXT_BOX:
+				default:
+					controlType = "text-box";
+				}
+				map.put("controlType", controlType);
+				final String alignment;
+				switch (parameterDefn.getAlignment()) {
+				case IScalarParameterDefn.LEFT:
+					alignment = "left";
+					break;
+				case IScalarParameterDefn.CENTER:
+					alignment = "center";
+					break;
+				case IScalarParameterDefn.RIGHT:
+					alignment = "right";
+					break;
+				case IScalarParameterDefn.AUTO:
+				default:
+					alignment = "auto";
+				}
+				map.put("alignment", alignment);
+				map.put("defaultValue", parameterDefn.getDefaultValue());
+				map.put("scalarParameterType",
+						parameterDefn.getScalarParameterType());
+				map.put("autoSuggestThreshold",
+						parameterDefn.getAutoSuggestThreshold());
+				jsonArray.put(map);
+			}
+			// reset the timer
+			FILES.put(UUID.fromString(fileIdString),
+					Long.valueOf(System.currentTimeMillis() + TIME_TO_LIVE));
+			return jsonArray.toString();
+		} finally {
+			task.close();
+		}
 	}
 
 	@POST
@@ -187,8 +340,8 @@ public class BirtEngineResource {
 			@Override
 			public void write(final OutputStream output) throws IOException,
 					WebApplicationException {
-				IReportEngine reportEngine;
-				reportEngine = ReportEngine.getReportEngine();
+				final IReportEngine reportEngine = ReportEngine
+						.getReportEngine();
 				IRunAndRenderTask runTask;
 				try {
 					final FileInputStream fis = new FileInputStream(file);
@@ -201,6 +354,11 @@ public class BirtEngineResource {
 					options.setOutputStream(output);
 					runTask.setRenderOption(options);
 					runTask.run();
+					// reset the timer
+					FILES.put(
+							UUID.fromString(fileIdString),
+							Long.valueOf(System.currentTimeMillis()
+									+ TIME_TO_LIVE));
 				} catch (final FileNotFoundException e) {
 					throw new NotFoundException(e);
 				} catch (final EngineException e) {
