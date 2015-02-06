@@ -6,8 +6,12 @@
 	<artifactId>birtMachine</artifactId>
 	<packaging>war</packaging>
 	<version>0.0.1-SNAPSHOT</version>
-	<name>BIRT Machine</name>
+	<name>bmr</name>
 	<url>http://maven.apache.org</url>
+	<properties>
+		<maven.compiler.source>1.7</maven.compiler.source>
+		<maven.compiler.target>1.7</maven.compiler.target>
+	</properties>
 	<dependencies>
 		<dependency>
 			<groupId>junit</groupId>
@@ -52,24 +56,25 @@
 			<version>4.4.1</version>
 		</dependency>
 
+		<!--
 		<dependency>
 			<groupId>net.sf.json-lib</groupId>
 			<artifactId>json-lib</artifactId>
 			<version>1.0</version>
 			<classifier>jdk15</classifier>
 		</dependency>
-		
-		<!--  
+		-->
+
 		<dependency>
 			<groupId>net.sf.json-lib</groupId>
 			<artifactId>json-lib</artifactId>
 			<version>2.4</version>
+			<classifier>jdk15</classifier>
 		</dependency>
-		-->
 
 	</dependencies>
 	<build>
-		<finalName>BIRT Machine</finalName>
+		<finalName>bmr</finalName>
 		<plugins>
 			<plugin>
 				<groupId>org.mortbay.jetty</groupId>

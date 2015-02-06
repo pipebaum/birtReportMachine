@@ -44,7 +44,7 @@ import org.eclipse.birt.report.engine.api.IRunAndRenderTask;
 import org.eclipse.birt.report.engine.api.IScalarParameterDefn;
 import org.eclipse.birt.report.engine.api.RenderOption;
 
-@Path("run")
+@Path("report")
 public class BirtEngineResource {
 
 	private static class FileInfo {
@@ -122,7 +122,7 @@ public class BirtEngineResource {
 	}
 
 	@POST
-	@Path("/report/upload")
+	@Path("/upload")
 	@Consumes({ MediaType.APPLICATION_OCTET_STREAM })
 	@Produces({ MediaType.APPLICATION_JSON })
 	public String uploadReport(final java.io.Reader reader) throws IOException {
@@ -152,7 +152,7 @@ public class BirtEngineResource {
 
 	// no practical use for this but it's handy for testing
 	@GET
-	@Path("/report/download/{fileId}")
+	@Path("/download/{fileId}")
 	@Produces({ MediaType.APPLICATION_OCTET_STREAM })
 	public StreamingOutput downloadReport(
 			@PathParam("fileId") final String fileIdString) {
@@ -181,7 +181,7 @@ public class BirtEngineResource {
 	}
 
 	@GET
-	@Path("/report/parameters/{fileId}")
+	@Path("/parameters/{fileId}")
 	@Produces({ MediaType.APPLICATION_JSON })
 	public String getParameters(@PathParam("fileId") final String fileIdString)
 			throws IOException, EngineException {
@@ -310,7 +310,7 @@ public class BirtEngineResource {
 						parameterDefn.getScalarParameterType());
 				map.put("autoSuggestThreshold",
 						parameterDefn.getAutoSuggestThreshold());
-				jsonArray.put(map);
+				jsonArray.add(map);
 			}
 			// reset the timer
 			FILES.put(UUID.fromString(fileIdString),
@@ -322,13 +322,13 @@ public class BirtEngineResource {
 	}
 
 	@POST
-	@Path("/report/run/{outputFormat}/{fileId}")
+	@Path("/run/{outputFormat}/{fileId}")
 	@Consumes({ MediaType.APPLICATION_JSON })
 	public Response runReport(final String inputJsonString,
 			@PathParam("outputFormat") final String outputFormat,
 			@PathParam("fileId") final String fileIdString) {
 		final JSONObject paramsJsonObject = JSONObject
-				.fromString(inputJsonString);
+				.fromObject(inputJsonString);
 		final File file = new File(RESOURCE_DIR, fileIdString);
 		final StreamingOutput entity = new StreamingOutput() {
 
