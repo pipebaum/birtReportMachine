@@ -10,11 +10,11 @@ public class RunReport {
 
 	public static void main(final String[] args) throws IOException {
 		final String fileIdString = args[0];
-		final String mimeType = args[1];
+		final String outputFormat = args[1];
 		final String params = args[2];
 		final URL url = new URL(
 				"http://localhost:8080/org.eclipse.birt.rip/birt/run/report/run/"
-						+ mimeType + "/" + fileIdString);
+						+ outputFormat + "/" + fileIdString);
 		final HttpURLConnection connection = (HttpURLConnection) url
 				.openConnection();
 		connection.setDoInput(true);

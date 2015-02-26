@@ -47,6 +47,10 @@ import org.eclipse.birt.report.engine.api.RenderOption;
 @Path("report")
 public class BirtEngineResource {
 
+	public BirtEngineResource() {
+		System.out.println("constructor");
+	}
+
 	private static class FileInfo {
 		public final UUID uuid;
 		public final long endTime;
@@ -126,6 +130,7 @@ public class BirtEngineResource {
 	@Consumes({ MediaType.APPLICATION_OCTET_STREAM })
 	@Produces({ MediaType.APPLICATION_JSON })
 	public String uploadReport(final java.io.Reader reader) throws IOException {
+
 		final UUID uuid = UUID.randomUUID();
 		RESOURCE_DIR.mkdirs();
 		final File file = new File(RESOURCE_DIR, uuid.toString());
@@ -157,12 +162,17 @@ public class BirtEngineResource {
 	public StreamingOutput downloadReport(
 			@PathParam("fileId") final String fileIdString) {
 		final File file = new File(RESOURCE_DIR, fileIdString);
+		final FileInputStream fis;
+		try {
+			fis = new FileInputStream(file);
+		} catch (final FileNotFoundException e) {
+			throw new NotFoundException(e);
+		}
 		return new StreamingOutput() {
 
 			@Override
 			public void write(final OutputStream output) throws IOException,
 					WebApplicationException {
-				final FileInputStream fis = new FileInputStream(file);
 				try {
 					final byte[] buffer = new byte[0x1000];
 					int bytesRead = fis.read(buffer);
