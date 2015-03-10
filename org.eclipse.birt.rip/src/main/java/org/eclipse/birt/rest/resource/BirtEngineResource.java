@@ -38,6 +38,7 @@ import org.eclipse.birt.report.engine.api.HTMLRenderOption;
 import org.eclipse.birt.report.engine.api.IGetParameterDefinitionTask;
 import org.eclipse.birt.report.engine.api.IParameterDefn;
 import org.eclipse.birt.report.engine.api.IParameterDefnBase;
+import org.eclipse.birt.report.engine.api.IParameterSelectionChoice;
 import org.eclipse.birt.report.engine.api.IReportEngine;
 import org.eclipse.birt.report.engine.api.IReportRunnable;
 import org.eclipse.birt.report.engine.api.IRunAndRenderTask;
@@ -188,6 +189,41 @@ public class BirtEngineResource {
 						Long.valueOf(System.currentTimeMillis() + TIME_TO_LIVE));
 			}
 		};
+	}
+
+	@GET
+	@Path("/parameter/choices/{fileId}/{parameterName}")
+	@Produces({ MediaType.APPLICATION_JSON })
+	public String getParameterChoices(
+			@PathParam("fileId") final String fileIdString,
+			@PathParam("parameterName") final String parameterName)
+			throws FileNotFoundException, EngineException {
+		final File file = new File(RESOURCE_DIR, fileIdString);
+		final FileInputStream fis = new FileInputStream(file);
+		final IReportEngine reportEngine = ReportEngine.getReportEngine();
+		final IReportRunnable design = reportEngine.openReportDesign(fis);
+		final IGetParameterDefinitionTask task = reportEngine
+				.createGetParameterDefinitionTask(design);
+		try {
+			@SuppressWarnings("unchecked")
+			final Collection<Object> birtChoices = task
+					.getSelectionList(parameterName);
+			final JSONArray choices = new JSONArray();
+			for (final Object object : birtChoices) {
+				if (!(object instanceof IParameterSelectionChoice))
+					continue;
+				final IParameterSelectionChoice birtChoice = (IParameterSelectionChoice) object;
+				final String label = birtChoice.getLabel();
+				final Object value = birtChoice.getValue();
+				final Map<String, Object> map = new HashMap<>();
+				map.put("label", label);
+				map.put("value", value);
+				choices.add(map);
+			}
+			return choices.toString();
+		} finally {
+			task.close();
+		}
 	}
 
 	@GET
