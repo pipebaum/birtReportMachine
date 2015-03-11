@@ -6,9 +6,13 @@ import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.math.BigDecimal;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -18,6 +22,7 @@ import java.util.UUID;
 
 import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
+import javax.ws.rs.NotAcceptableException;
 import javax.ws.rs.NotFoundException;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
@@ -44,6 +49,7 @@ import org.eclipse.birt.report.engine.api.IReportRunnable;
 import org.eclipse.birt.report.engine.api.IRunAndRenderTask;
 import org.eclipse.birt.report.engine.api.IScalarParameterDefn;
 import org.eclipse.birt.report.engine.api.RenderOption;
+import org.eclipse.birt.report.engine.api.impl.ParameterValidationException;
 
 @Path("report")
 public class BirtEngineResource {
@@ -378,53 +384,177 @@ public class BirtEngineResource {
 		final File file = new File(RESOURCE_DIR, fileIdString);
 		final StreamingOutput entity = new StreamingOutput() {
 
+			@SuppressWarnings("unchecked")
 			@Override
 			public void write(final OutputStream output) throws IOException,
 					WebApplicationException {
 				final IReportEngine reportEngine = ReportEngine
 						.getReportEngine();
+				List<EngineException> errors = null;
 				IRunAndRenderTask runTask;
 				try {
 					final FileInputStream fis = new FileInputStream(file);
 					final IReportRunnable design = reportEngine
 							.openReportDesign(fis);
-					runTask = reportEngine.createRunAndRenderTask(design);
-					final Iterator<?> iterator = paramsJsonObject.keys();
-					while (iterator.hasNext()) {
-						final Object object = iterator.next();
-						if (object instanceof String) {
-							final String paramName = (String) object;
-							final Object paramValue = paramsJsonObject
-									.get(paramName);
-							runTask.setParameterValue(paramName, paramValue);
+					final IGetParameterDefinitionTask paramTask = reportEngine
+							.createGetParameterDefinitionTask(design);
+					try {
+						runTask = reportEngine.createRunAndRenderTask(design);
+						try {
+							final Iterator<?> iterator = paramsJsonObject
+									.keys();
+							while (iterator.hasNext()) {
+								final Object keyObj = iterator.next();
+								if (!(keyObj instanceof String))
+									continue;
+								final String paramName = (String) keyObj;
+								Object paramValue = paramsJsonObject
+										.get(paramName);
+								final IParameterDefnBase pdb = paramTask
+										.getParameterDefn(paramName);
+								if (!(pdb instanceof IScalarParameterDefn))
+									continue;
+								final IScalarParameterDefn parameterDefn = (IScalarParameterDefn) pdb;
+								if (parameterDefn.getParameterType() != IScalarParameterDefn.SCALAR_PARAMETER)
+									continue;
+								final int birtDataType = parameterDefn
+										.getDataType();
+								try {
+									switch (birtDataType) {
+									case IParameterDefn.TYPE_STRING:
+										paramValue = paramValue.toString();
+										break;
+									case IParameterDefn.TYPE_FLOAT:
+										if (paramValue instanceof String) {
+											paramValue = Float
+													.valueOf((String) paramValue);
+
+										} else if (paramValue instanceof Float) {
+										} else if (paramValue instanceof Number) {
+											paramValue = Float
+													.valueOf(((Number) paramValue)
+															.floatValue());
+										}
+										break;
+									case IParameterDefn.TYPE_DECIMAL:
+										if (paramValue instanceof String) {
+											paramValue = BigDecimal
+													.valueOf(Double
+															.valueOf(
+																	(String) paramValue)
+															.doubleValue());
+										} else if (paramValue instanceof BigDecimal) {
+
+										} else if (paramValue instanceof Number) {
+											paramValue = BigDecimal
+													.valueOf(((Number) paramValue)
+															.doubleValue());
+										}
+										break;
+									case IParameterDefn.TYPE_DATE_TIME:
+										if (paramValue instanceof String) {
+											final DateFormat df = new SimpleDateFormat(
+													"yyyy-MM-dd HH:mm:ss");
+											paramValue = df
+													.parse((String) paramValue);
+										} else if (paramValue instanceof Date) {
+										} else if (paramValue instanceof Long) {
+											paramValue = new Date(
+													((Long) paramValue)
+															.longValue());
+										}
+										break;
+									case IParameterDefn.TYPE_BOOLEAN:
+										if (paramValue instanceof String) {
+											paramValue = Boolean
+													.valueOf("true"
+															.equalsIgnoreCase((String) paramValue));
+										} else if (paramValue instanceof Boolean) {
+										} else if (paramValue instanceof Number) {
+											paramValue = Boolean
+													.valueOf(((Number) paramValue)
+															.doubleValue() != 0);
+										}
+										break;
+									case IParameterDefn.TYPE_INTEGER:
+										if (paramValue instanceof String) {
+											paramValue = Integer
+													.valueOf((String) paramValue);
+
+										} else if (paramValue instanceof Integer) {
+										} else if (paramValue instanceof Number) {
+											paramValue = Integer
+													.valueOf(((Number) paramValue)
+															.intValue());
+										}
+										break;
+									case IParameterDefn.TYPE_DATE:
+										if (paramValue instanceof String) {
+											final DateFormat df = new SimpleDateFormat(
+													"yyyy-MM-dd");
+											paramValue = df
+													.parse((String) paramValue);
+										} else if (paramValue instanceof Date) {
+										} else if (paramValue instanceof Long) {
+											paramValue = new Date(
+													((Long) paramValue)
+															.longValue());
+										}
+										break;
+									case IParameterDefn.TYPE_TIME:
+										if (paramValue instanceof String) {
+											final DateFormat df = new SimpleDateFormat(
+													"HH:mm:ss");
+											paramValue = df
+													.parse((String) paramValue);
+										} else if (paramValue instanceof Date) {
+										} else if (paramValue instanceof Long) {
+											paramValue = new Date(
+													((Long) paramValue)
+															.longValue());
+										}
+										break;
+									}
+								} catch (final Exception e) {
+									throw new NotAcceptableException(e);
+								}
+								runTask.setParameterValue(paramName, paramValue);
+							}
+							// final boolean valid =
+							// runTask.validateParameters();
+							final RenderOption options = new HTMLRenderOption();
+							options.setOutputFormat(outputFormat);
+							options.setOutputStream(output);
+							runTask.setRenderOption(options);
+							runTask.run();
+							errors = runTask.getErrors();
+						} finally {
+							runTask.close();
 						}
+					} finally {
+						paramTask.close();
 					}
-					runTask.validateParameters();
-					final RenderOption options = new HTMLRenderOption();
-					options.setOutputFormat(outputFormat);
-					options.setOutputStream(output);
-					runTask.setRenderOption(options);
-					runTask.run();
-					// reset the timer
-					FILES.put(
-							UUID.fromString(fileIdString),
-							Long.valueOf(System.currentTimeMillis()
-									+ TIME_TO_LIVE));
+				} catch (final ParameterValidationException e) {
+					throw new NotAcceptableException(e);
 				} catch (final FileNotFoundException e) {
 					throw new NotFoundException(e);
 				} catch (final EngineException e) {
 					throw new ServerErrorException(500, e);
 				}
-				@SuppressWarnings("unchecked")
-				final List<EngineException> errors = runTask.getErrors();
-				for (final EngineException engineException : errors) {
-					System.out.println("ERROR:\t"
-							+ engineException.getMessage());
+				if (errors != null) {
+					for (final EngineException engineException : errors) {
+						System.out.println("ERROR:\t"
+								+ engineException.getMessage());
+					}
+					if (!errors.isEmpty())
+						throw new ServerErrorException(
+								errors.size()
+										+ " error(s) encountered.  See log for details.",
+								500);
 				}
-				if (!errors.isEmpty())
-					throw new ServerErrorException(errors.size()
-							+ " error(s) encountered.  See log for details.",
-							500);
+				// reset the timer
+				FILES.put(UUID.fromString(fileIdString),
+						Long.valueOf(System.currentTimeMillis() + TIME_TO_LIVE));
 				/*
 				 * final FileInputStream fis = new FileInputStream(outputFile);
 				 * try { final byte[] buffer = new byte[0x1000]; int bytesRead =
