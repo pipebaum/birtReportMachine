@@ -14,10 +14,12 @@ import java.util.Collection;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.UUID;
 
 import javax.ws.rs.Consumes;
@@ -50,6 +52,10 @@ import org.eclipse.birt.report.engine.api.IRunAndRenderTask;
 import org.eclipse.birt.report.engine.api.IScalarParameterDefn;
 import org.eclipse.birt.report.engine.api.RenderOption;
 import org.eclipse.birt.report.engine.api.impl.ParameterValidationException;
+import org.eclipse.birt.report.model.api.DesignElementHandle;
+import org.eclipse.birt.report.model.api.elements.structures.IncludeScript;
+import org.eclipse.birt.report.model.api.elements.structures.IncludedCssStyleSheet;
+import org.eclipse.birt.report.model.api.elements.structures.IncludedLibrary;
 
 @Path("report")
 public class BirtEngineResource {
@@ -70,26 +76,6 @@ public class BirtEngineResource {
 		}
 	}
 
-	private static List<FileInfo> getFileInfoList() {
-		final List<FileInfo> list = new ArrayList<>();
-		for (final UUID uuid : FILES.keySet()) {
-			Long endTime = FILES.get(uuid);
-			if (endTime == null)
-				endTime = Long.valueOf(0);
-			list.add(new FileInfo(uuid, endTime.longValue()));
-		}
-		list.sort(new Comparator<FileInfo>() {
-
-			@Override
-			public int compare(final FileInfo o1, final FileInfo o2) {
-				final String s1 = o1.toString();
-				final String s2 = o2.toString();
-				return s1.compareTo(s2);
-			}
-		});
-		return list;
-	}
-
 	private static void deleteFile(final UUID uuid) {
 		System.out.println("deleting file " + uuid);
 		FILES.remove(uuid);
@@ -101,34 +87,57 @@ public class BirtEngineResource {
 
 		@Override
 		public void run() {
-			long sleepTime = Long.MAX_VALUE;
-			System.out.println("sleeping until interrupted");
+			long sleepTime = getNextSleepTime();
 			while (true) {
-				if (sleepTime > 0)
-					try {
-						Thread.sleep(sleepTime);
-					} catch (final InterruptedException e) {
-						// interrupted when a new file is added
-					}
-				final List<FileInfo> list = getFileInfoList();
-				if (list.isEmpty()) {
-					sleepTime = Long.MAX_VALUE;
-					System.out.println("sleeping until interrupted");
+				try {
+					Thread.sleep(sleepTime);
+				} catch (final InterruptedException e) {
+					// interrupted when a new file is added
+				}
+				sleepTime = getNextSleepTime();
+			}
+		}
+
+		private long getNextSleepTime() {
+			final List<FileInfo> list = new ArrayList<>();
+			for (final UUID uuid : FILES.keySet()) {
+				Long endTime = FILES.get(uuid);
+				if (endTime == null)
+					endTime = Long.valueOf(0);
+				list.add(new FileInfo(uuid, endTime.longValue()));
+			}
+			if (list.isEmpty()) {
+				System.out.println("Sleeping until interrupted");
+				return Long.MAX_VALUE;
+			}
+			// sort by end time
+			list.sort(new Comparator<FileInfo>() {
+
+				@Override
+				public int compare(final FileInfo o1, final FileInfo o2) {
+					if (o1.endTime < o2.endTime)
+						return -1;
+					if (o1.endTime > o2.endTime)
+						return 1;
+					return 0;
+				}
+			});
+			long nextEndTime = 0;
+			for (final FileInfo fileInfo : list) {
+				if (fileInfo.endTime <= System.currentTimeMillis()) {
+					deleteFile(fileInfo.uuid);
 					continue;
 				}
-				long nextEndTime = 0;
-				for (final FileInfo fileInfo : list) {
-					if (fileInfo.endTime <= System.currentTimeMillis()) {
-						deleteFile(fileInfo.uuid);
-						continue;
-					}
-					nextEndTime = fileInfo.endTime;
-					break;
-				}
-				sleepTime = nextEndTime - System.currentTimeMillis();
-				System.out.println("sleeping " + (sleepTime / 1000.0)
-						+ " seconds");
+				nextEndTime = fileInfo.endTime;
+				// stop processing the list once we hit an end time that's in
+				// the future
+				break;
 			}
+			long sleepTime = nextEndTime - System.currentTimeMillis();
+			if (sleepTime < 0)
+				sleepTime = 0;
+			System.out.println("sleeping " + (sleepTime / 1000.0) + " seconds");
+			return sleepTime;
 		}
 	}
 
@@ -158,8 +167,62 @@ public class BirtEngineResource {
 		TERMINATOR.interrupt();
 		final Map<String, Object> outputMap = new HashMap<>();
 		outputMap.put("fileId", uuid.toString());
+		try {
+			final List<String> resourceFiles = discoverResources(file);
+			outputMap.put("resourceFiles", resourceFiles);
+		} catch (final EngineException e) {
+			// most likely, this is not a report design
+			outputMap.put("error", e.toString());
+		}
 		final JSONObject jsonObject = JSONObject.fromObject(outputMap);
 		return jsonObject.toString();
+	}
+
+	private List<String> discoverResources(final File file)
+			throws FileNotFoundException, EngineException {
+		final Set<String> set = new HashSet<String>();
+		final FileInputStream fis = new FileInputStream(file);
+		final IReportEngine reportEngine = ReportEngine.getReportEngine();
+		final IReportRunnable design = reportEngine.openReportDesign(fis);
+		final DesignElementHandle deh = design.getDesignHandle();
+		@SuppressWarnings("unchecked")
+		final List<Object> scripts = deh.getListProperty("includeScripts");
+		if (scripts != null) {
+			for (final Object scriptObj : scripts) {
+				if (scriptObj instanceof IncludeScript) {
+					final IncludeScript includeScript = (IncludeScript) scriptObj;
+					final String fileName = includeScript.getFileName();
+					if (fileName != null)
+						set.add(fileName);
+				}
+			}
+		}
+		@SuppressWarnings("unchecked")
+		final List<Object> libraries = deh.getListProperty("libraries");
+		if (libraries != null) {
+			for (final Object libraryObj : libraries) {
+				if (libraryObj instanceof IncludedLibrary) {
+					final IncludedLibrary includeLibrary = (IncludedLibrary) libraryObj;
+					final String fileName = includeLibrary.getFileName();
+					if (fileName != null)
+						set.add(fileName);
+				}
+			}
+		}
+		@SuppressWarnings("unchecked")
+		final List<Object> cssStyleSheets = deh
+				.getListProperty("cssStyleSheets");
+		if (cssStyleSheets != null) {
+			for (final Object cssStyleSheetObj : cssStyleSheets) {
+				if (cssStyleSheetObj instanceof IncludedCssStyleSheet) {
+					final IncludedCssStyleSheet includedCssStyleSheet = (IncludedCssStyleSheet) cssStyleSheetObj;
+					final String fileName = includedCssStyleSheet.getFileName();
+					if (fileName != null)
+						set.add(fileName);
+				}
+			}
+		}
+		return new ArrayList<>(set);
 	}
 
 	// no practical use for this but it's handy for testing

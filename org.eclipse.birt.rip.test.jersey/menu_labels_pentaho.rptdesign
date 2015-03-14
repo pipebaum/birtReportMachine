@@ -1,0 +1,3472 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<report xmlns="http://www.eclipse.org/birt/2005/design" version="3.2.22" id="1">
+    <property name="createdBy">Eclipse BIRT Designer Version 3.7.1.v20110905 Build &lt;3.7.1.v20110905-1820></property>
+    <list-property name="includeScripts">
+        <property>resources/common.js</property>
+    </list-property>
+    <property name="units">in</property>
+    <method name="initialize"><![CDATA[var iterate = function (collection, callback) {
+	var iterator = collection.iterator();
+	while(iterator.hasNext()) {
+		callback(iterator.next(), iterator.hasNext());
+	}
+};
+var log = function (message) {
+	var file = params["dev_logfile"].value;
+	if(file != null) {
+		var pw = new Packages.java.io.PrintWriter(new Packages.java.io.FileOutputStream(file, true));
+		pw.print(new Date().toString());
+		pw.print(" ");
+		pw.println(message);
+		pw.close();
+	}
+};
+
+var displayParam = function(param) {
+	if(param == null)
+		return "null";
+	if(param.getClass) {
+		if(param instanceof Packages.java.lang.String) {
+			return "string: " + param;
+		}
+		if(param instanceof Packages.java.sql.Date) {
+			return param;
+		}
+		if(param instanceof Packages.java.util.Collection) {
+			var list = [];
+			iterate(param, function(value) {
+				list.push(value);
+			});
+			return "[" + list.join(",") + "]";
+		}
+		if(param.length) {
+			var list = [];
+			for(var i = 0; i < param.length; i++) {
+				var value = param[i];
+				list.push(value);
+			}
+			return "[" + list.join(",") + "]";
+		}
+		return param;
+	}
+	return param;
+};
+
+var outputFormat = reportContext.getOutputFormat();
+var taskType = reportContext.getTaskType();
+log("report started, output format = " + outputFormat + ", task type = " + taskType);
+var isBlank = function(string) {
+	var s = string.match("[^ ]");
+	// log("'" + string + "' matches = " + (s == null ? "null" : s.length));
+	return s == null ? true : s.length == 0;
+};
+var getDimension = function(string) {
+	var numberPart = string.match(/^[0-9.]+/);
+	var textPart = string.match(/[a-zA-Z]+$/);
+	var result = { 
+		measure: numberPart.length == 0 ? 0 : numberPart[0] * 1, 
+		units: textPart.length == 0 ? "in" : textPart[0] + "" };
+	// log("getDimension measure = '" + result.measure + "', units = '" + result.units + "'");
+	return result;
+};
+var convertDimension = function(dimension, units) {
+	// log("converting " + dimension.measure + " '" + dimension.units + "' to " + units);
+	var result = dimension.measure;
+	// convert source to inches
+	var sourceUnits = dimension.units.toLowerCase();
+	if(sourceUnits == "pt") {
+		result = result / 72.0;
+	} else
+	if(sourceUnits == "px") {
+		result = result / 96.0;
+	} else
+	if(sourceUnits == "cm") {
+		result = result / 2.54;
+	} else
+	if(sourceUnits == "mm") {
+		result = result / 25.4;
+	}
+	// log("inches = " + result);
+	// convert inches to target units
+	var targetUnits = units.toLowerCase();
+	if(targetUnits == "pt") {
+		result = result * 72.0;
+	} else
+	if(targetUnits == "px") {
+		result = result * 96.0;
+	} else
+	if(targetUnits == "cm") {
+		result = result * 2.54;
+	} else
+	if(targetUnits == "mm") {
+		result = result * 25.4;
+	}
+	// log("result = " + result);
+	return result;
+}
+var getMultiNumericParam = function(name) {
+	if(params["multi_" + name + "_all"].value) {
+		log("all " + name + "s");
+		return null;
+	}
+	var value = params["multi_" + name + "_id"].value;
+	var list = [];
+	if(value.length) {
+		log(name + " is an array");
+		for(var i = 0; i < value.length; i++) {
+			list.push((value[i] + "").replace(/[,'()]/g, ""));
+		}
+	}
+	else {
+		log(name + " = " + value);
+		list.push((value + "").replace(/[,'()]/g, ""));
+	}
+	log(name + "s = " + list);
+	return list.join(", ")
+}
+var getMultiStringParam = function(name) {
+	if(params["multi_" + name + "_all"].value) {
+		log("all " + name + "s");
+		return null;
+	}
+	var value = params["multi_" + name + "_id"].value;
+	var list = [];
+	if(value.length) {
+		log(name + " is an array");
+		for(var i = 0; i < value.length; i++) {
+			list.push("'" + (value[i] + "").replace(/'/g, "") + "'");
+		}
+	}
+	else {
+		log(name + " = '" + value + "'");
+		list.push("'" + (value + "").replace(/'/g, "") + "'");
+	}
+	log(name + "s = " + list);
+	return list.join(", ")
+}
+]]></method>
+    <method name="onPrepare"><![CDATA[var pageHandle = reportContext.getDesignHandle().getMasterPages().get(0);
+log("pageHandle class = " + pageHandle.getClass().getName());
+pageHandle.setProperty("topMargin", params["label_top_margin"].value);
+pageHandle.setProperty("bottomMargin", "0px");
+pageHandle.setProperty("leftMargin", params["label_left_margin"].value);
+pageHandle.setProperty("rightMargin", "0px");
+]]></method>
+    <method name="beforeFactory"><![CDATA[
+]]></method>
+    <property name="iconFile">/templates/blank_report.gif</property>
+    <property name="bidiLayoutOrientation">ltr</property>
+    <property name="imageDPI">95</property>
+    <parameters>
+        <scalar-parameter name="dbname" id="599">
+            <text-property name="promptText">Database Name</text-property>
+            <property name="valueType">static</property>
+            <property name="dataType">string</property>
+            <property name="distinct">true</property>
+            <simple-property-list name="defaultValue">
+                <value type="constant">sandbox</value>
+            </simple-property-list>
+            <list-property name="selectionList"/>
+            <property name="paramType">simple</property>
+            <property name="controlType">text-box</property>
+            <structure name="format">
+                <property name="category">Unformatted</property>
+            </structure>
+        </scalar-parameter>
+        <scalar-parameter name="login_id" id="460">
+            <text-property name="promptText">Login ID</text-property>
+            <property name="valueType">static</property>
+            <property name="dataType">integer</property>
+            <property name="distinct">true</property>
+            <simple-property-list name="defaultValue">
+                <value type="constant">13</value>
+            </simple-property-list>
+            <list-property name="selectionList"/>
+            <property name="paramType">simple</property>
+            <property name="controlType">text-box</property>
+            <structure name="format">
+                <property name="category">Unformatted</property>
+            </structure>
+        </scalar-parameter>
+        <scalar-parameter name="multi_school_all" id="801">
+            <text-property name="promptText">Multi-School All</text-property>
+            <property name="valueType">static</property>
+            <property name="isRequired">false</property>
+            <property name="dataType">boolean</property>
+            <property name="distinct">true</property>
+            <simple-property-list name="defaultValue">
+                <value type="constant">True</value>
+            </simple-property-list>
+            <list-property name="selectionList"/>
+            <property name="paramType">simple</property>
+            <property name="controlType">check-box</property>
+            <structure name="format"/>
+        </scalar-parameter>
+        <scalar-parameter name="multi_school_id" id="62">
+            <text-property name="promptText">Multi-School ID</text-property>
+            <property name="valueType">static</property>
+            <property name="isRequired">false</property>
+            <property name="dataType">string</property>
+            <property name="distinct">true</property>
+            <simple-property-list name="defaultValue">
+                <value type="constant">260</value>
+            </simple-property-list>
+            <list-property name="selectionList">
+                <structure>
+                    <property name="value">dummy</property>
+                    <property name="label">dummy</property>
+                </structure>
+                <structure>
+                    <property name="value">50</property>
+                    <property name="label">Birch</property>
+                </structure>
+                <structure>
+                    <property name="value">214</property>
+                    <property name="label">Mullen HS</property>
+                </structure>
+                <structure>
+                    <property name="value">136</property>
+                    <property name="label">Ben Franklin School</property>
+                </structure>
+                <structure>
+                    <property name="value">202</property>
+                    <property name="label">Fairfield School</property>
+                </structure>
+                <structure>
+                    <property name="value">250</property>
+                    <property name="label">Nichole Test School</property>
+                </structure>
+                <structure>
+                    <property name="value">1</property>
+                    <property name="label">1</property>
+                </structure>
+                <structure>
+                    <property name="value">135</property>
+                    <property name="label">135</property>
+                </structure>
+                <structure>
+                    <property name="value">9</property>
+                    <property name="label">Cardinal Newman</property>
+                </structure>
+                <structure>
+                    <property name="value">260</property>
+                    <property name="label">St. Francis Xavier</property>
+                </structure>
+            </list-property>
+            <property name="paramType">multi-value</property>
+            <property name="controlType">list-box</property>
+            <property name="mustMatch">true</property>
+            <property name="fixedOrder">true</property>
+            <structure name="format">
+                <property name="category">Unformatted</property>
+            </structure>
+        </scalar-parameter>
+        <scalar-parameter name="multi_room_all" id="802">
+            <text-property name="promptText">multi_room_all</text-property>
+            <property name="valueType">static</property>
+            <property name="isRequired">false</property>
+            <property name="dataType">boolean</property>
+            <property name="distinct">true</property>
+            <simple-property-list name="defaultValue">
+                <value type="constant">true</value>
+            </simple-property-list>
+            <list-property name="selectionList"/>
+            <property name="paramType">simple</property>
+            <property name="controlType">check-box</property>
+            <structure name="format"/>
+        </scalar-parameter>
+        <scalar-parameter name="multi_room_id" id="343">
+            <text-property name="promptText">multi_room_id</text-property>
+            <property name="valueType">static</property>
+            <property name="isRequired">false</property>
+            <property name="dataType">string</property>
+            <property name="distinct">true</property>
+            <list-property name="selectionList">
+                <structure>
+                    <property name="value">dummy</property>
+                    <property name="label">dummy</property>
+                </structure>
+            </list-property>
+            <property name="paramType">multi-value</property>
+            <property name="controlType">list-box</property>
+            <property name="mustMatch">true</property>
+            <property name="fixedOrder">true</property>
+            <structure name="format">
+                <property name="category">Unformatted</property>
+            </structure>
+        </scalar-parameter>
+        <scalar-parameter name="multi_teacher_all" id="803">
+            <text-property name="promptText">multi_teacher_all</text-property>
+            <property name="valueType">static</property>
+            <property name="isRequired">false</property>
+            <property name="dataType">boolean</property>
+            <property name="distinct">true</property>
+            <simple-property-list name="defaultValue">
+                <value type="constant">true</value>
+            </simple-property-list>
+            <list-property name="selectionList"/>
+            <property name="paramType">simple</property>
+            <property name="controlType">check-box</property>
+            <structure name="format"/>
+        </scalar-parameter>
+        <scalar-parameter name="multi_teacher_id" id="804">
+            <text-property name="promptText">multi_teacher_id</text-property>
+            <property name="valueType">static</property>
+            <property name="isRequired">false</property>
+            <property name="dataType">string</property>
+            <property name="distinct">true</property>
+            <list-property name="selectionList">
+                <structure>
+                    <property name="value">dummy</property>
+                    <property name="label">dummy</property>
+                </structure>
+            </list-property>
+            <property name="paramType">multi-value</property>
+            <property name="controlType">list-box</property>
+            <property name="mustMatch">true</property>
+            <property name="fixedOrder">true</property>
+            <structure name="format">
+                <property name="category">Unformatted</property>
+            </structure>
+        </scalar-parameter>
+        <scalar-parameter name="multi_lunch_session_all" id="805">
+            <text-property name="promptText">multi_lunch_session_all</text-property>
+            <property name="valueType">static</property>
+            <property name="isRequired">false</property>
+            <property name="dataType">boolean</property>
+            <property name="distinct">true</property>
+            <simple-property-list name="defaultValue">
+                <value type="constant">true</value>
+            </simple-property-list>
+            <list-property name="selectionList"/>
+            <property name="paramType">simple</property>
+            <property name="controlType">check-box</property>
+            <structure name="format"/>
+        </scalar-parameter>
+        <scalar-parameter name="multi_lunch_session_id" id="806">
+            <text-property name="promptText">multi_lunch_session_id</text-property>
+            <property name="valueType">static</property>
+            <property name="isRequired">false</property>
+            <property name="dataType">string</property>
+            <property name="distinct">true</property>
+            <list-property name="selectionList">
+                <structure>
+                    <property name="value">dummy</property>
+                    <property name="label">dummy</property>
+                </structure>
+            </list-property>
+            <property name="paramType">multi-value</property>
+            <property name="controlType">list-box</property>
+            <property name="mustMatch">true</property>
+            <property name="fixedOrder">true</property>
+            <structure name="format">
+                <property name="category">Unformatted</property>
+            </structure>
+        </scalar-parameter>
+        <scalar-parameter name="multi_grade_all" id="807">
+            <text-property name="promptText">multi_grade_all</text-property>
+            <property name="valueType">static</property>
+            <property name="isRequired">false</property>
+            <property name="dataType">boolean</property>
+            <property name="distinct">true</property>
+            <simple-property-list name="defaultValue">
+                <value type="constant">true</value>
+            </simple-property-list>
+            <list-property name="selectionList"/>
+            <property name="paramType">simple</property>
+            <property name="controlType">check-box</property>
+            <structure name="format"/>
+        </scalar-parameter>
+        <scalar-parameter name="multi_grade_id" id="808">
+            <text-property name="promptText">multi_grade_id</text-property>
+            <property name="valueType">static</property>
+            <property name="isRequired">false</property>
+            <property name="dataType">string</property>
+            <property name="distinct">true</property>
+            <list-property name="selectionList">
+                <structure>
+                    <property name="value">dummy</property>
+                    <property name="label">dummy</property>
+                </structure>
+            </list-property>
+            <property name="paramType">multi-value</property>
+            <property name="controlType">list-box</property>
+            <property name="mustMatch">true</property>
+            <property name="fixedOrder">true</property>
+            <structure name="format">
+                <property name="category">Unformatted</property>
+            </structure>
+        </scalar-parameter>
+        <scalar-parameter name="multi_vendor_all" id="809">
+            <text-property name="promptText">multi_vendor_all</text-property>
+            <property name="valueType">static</property>
+            <property name="isRequired">false</property>
+            <property name="dataType">boolean</property>
+            <property name="distinct">true</property>
+            <simple-property-list name="defaultValue">
+                <value type="constant">true</value>
+            </simple-property-list>
+            <list-property name="selectionList"/>
+            <property name="paramType">simple</property>
+            <property name="controlType">check-box</property>
+            <structure name="format"/>
+        </scalar-parameter>
+        <scalar-parameter name="multi_vendor_id" id="810">
+            <text-property name="promptText">multi_vendor_id</text-property>
+            <property name="valueType">static</property>
+            <property name="isRequired">false</property>
+            <property name="dataType">string</property>
+            <property name="distinct">true</property>
+            <list-property name="selectionList">
+                <structure>
+                    <property name="value">dummy</property>
+                    <property name="label">dummy</property>
+                </structure>
+                <structure>
+                    <property name="value">COLD</property>
+                    <property name="label">COLD</property>
+                </structure>
+                <structure>
+                    <property name="value">Pizza Hut</property>
+                    <property name="label">Pizza Hut</property>
+                </structure>
+            </list-property>
+            <property name="paramType">multi-value</property>
+            <property name="controlType">list-box</property>
+            <property name="mustMatch">true</property>
+            <property name="fixedOrder">true</property>
+            <structure name="format">
+                <property name="category">Unformatted</property>
+            </structure>
+        </scalar-parameter>
+        <scalar-parameter name="multi_menu_cycle_all" id="811">
+            <text-property name="promptText">multi_menu_cycle_all</text-property>
+            <property name="valueType">static</property>
+            <property name="isRequired">false</property>
+            <property name="dataType">boolean</property>
+            <property name="distinct">true</property>
+            <simple-property-list name="defaultValue">
+                <value type="constant">true</value>
+            </simple-property-list>
+            <list-property name="selectionList"/>
+            <property name="paramType">simple</property>
+            <property name="controlType">check-box</property>
+            <structure name="format"/>
+        </scalar-parameter>
+        <scalar-parameter name="multi_menu_cycle_id" id="812">
+            <text-property name="promptText">multi_menu_cycle_id</text-property>
+            <property name="valueType">static</property>
+            <property name="isRequired">false</property>
+            <property name="dataType">string</property>
+            <property name="distinct">true</property>
+            <list-property name="selectionList">
+                <structure>
+                    <property name="value">dummy</property>
+                    <property name="label">dummy</property>
+                </structure>
+            </list-property>
+            <property name="paramType">multi-value</property>
+            <property name="controlType">list-box</property>
+            <property name="mustMatch">true</property>
+            <property name="fixedOrder">true</property>
+            <structure name="format">
+                <property name="category">Unformatted</property>
+            </structure>
+        </scalar-parameter>
+        <scalar-parameter name="start_date" id="349">
+            <text-property name="promptText">start_date</text-property>
+            <property name="valueType">static</property>
+            <property name="dataType">date</property>
+            <property name="distinct">true</property>
+            <simple-property-list name="defaultValue">
+                <value type="constant">2015-03-01</value>
+            </simple-property-list>
+            <list-property name="selectionList"/>
+            <property name="paramType">simple</property>
+            <property name="controlType">text-box</property>
+            <structure name="format">
+                <property name="category">Unformatted</property>
+            </structure>
+        </scalar-parameter>
+        <scalar-parameter name="end_date" id="350">
+            <text-property name="promptText">end_date</text-property>
+            <property name="valueType">static</property>
+            <property name="dataType">date</property>
+            <property name="distinct">true</property>
+            <simple-property-list name="defaultValue">
+                <value type="constant">2015-03-31</value>
+            </simple-property-list>
+            <list-property name="selectionList"/>
+            <property name="paramType">simple</property>
+            <property name="controlType">text-box</property>
+            <structure name="format">
+                <property name="category">Unformatted</property>
+            </structure>
+        </scalar-parameter>
+        <scalar-parameter name="ml_group_by_new" id="600">
+            <property name="valueType">static</property>
+            <property name="dataType">string</property>
+            <property name="distinct">true</property>
+            <simple-property-list name="defaultValue">
+                <value type="constant">room</value>
+            </simple-property-list>
+            <list-property name="selectionList">
+                <structure>
+                    <property name="value">room</property>
+                    <property name="label">Room</property>
+                </structure>
+                <structure>
+                    <property name="value">teacher</property>
+                    <property name="label">Teacher</property>
+                </structure>
+                <structure>
+                    <property name="value">grade</property>
+                    <property name="label">Grade</property>
+                </structure>
+                <structure>
+                    <property name="value">ls</property>
+                    <property name="label">Lunch Session</property>
+                </structure>
+                <structure>
+                    <property name="value">student</property>
+                    <property name="label">Student</property>
+                </structure>
+                <structure>
+                    <property name="value">item</property>
+                    <property name="label">Meal Item</property>
+                </structure>
+            </list-property>
+            <property name="paramType">simple</property>
+            <property name="controlType">list-box</property>
+            <property name="mustMatch">false</property>
+            <property name="fixedOrder">true</property>
+            <structure name="format">
+                <property name="category">Unformatted</property>
+            </structure>
+        </scalar-parameter>
+        <scalar-parameter name="by_day" id="601">
+            <text-property name="promptText">by_day</text-property>
+            <property name="valueType">static</property>
+            <property name="isRequired">false</property>
+            <property name="dataType">boolean</property>
+            <property name="distinct">true</property>
+            <simple-property-list name="defaultValue">
+                <value type="constant">false</value>
+            </simple-property-list>
+            <list-property name="selectionList"/>
+            <property name="paramType">simple</property>
+            <property name="controlType">check-box</property>
+            <structure name="format"/>
+        </scalar-parameter>
+        <scalar-parameter name="ml_page_break" id="813">
+            <property name="valueType">static</property>
+            <property name="dataType">string</property>
+            <property name="distinct">true</property>
+            <simple-property-list name="defaultValue">
+                <value type="constant">grouping</value>
+            </simple-property-list>
+            <list-property name="selectionList">
+                <structure>
+                    <property name="value">school</property>
+                    <property name="label">School</property>
+                </structure>
+                <structure>
+                    <property name="value">day</property>
+                    <property name="label">Day</property>
+                </structure>
+                <structure>
+                    <property name="value">grouping</property>
+                    <property name="label">Grouping</property>
+                </structure>
+                <structure>
+                    <property name="value">never</property>
+                    <property name="label">Never</property>
+                </structure>
+            </list-property>
+            <property name="paramType">simple</property>
+            <property name="controlType">list-box</property>
+            <property name="mustMatch">true</property>
+            <property name="fixedOrder">true</property>
+            <structure name="format">
+                <property name="category">Unformatted</property>
+            </structure>
+        </scalar-parameter>
+        <scalar-parameter name="vendor_items_only" id="603">
+            <text-property name="promptText">vendor_items_only</text-property>
+            <property name="valueType">static</property>
+            <property name="isRequired">false</property>
+            <property name="dataType">boolean</property>
+            <property name="distinct">true</property>
+            <simple-property-list name="defaultValue">
+                <value type="constant">true</value>
+            </simple-property-list>
+            <list-property name="selectionList"/>
+            <property name="paramType">simple</property>
+            <property name="controlType">check-box</property>
+            <structure name="format"/>
+        </scalar-parameter>
+        <scalar-parameter name="include_student_name" id="604">
+            <text-property name="promptText">include_student_name</text-property>
+            <property name="valueType">static</property>
+            <property name="isRequired">false</property>
+            <property name="dataType">boolean</property>
+            <property name="distinct">true</property>
+            <simple-property-list name="defaultValue">
+                <value type="constant">true</value>
+            </simple-property-list>
+            <list-property name="selectionList"/>
+            <property name="paramType">simple</property>
+            <property name="controlType">check-box</property>
+            <structure name="format"/>
+        </scalar-parameter>
+        <scalar-parameter name="include_student_id" id="605">
+            <text-property name="promptText">include_student_id</text-property>
+            <property name="valueType">static</property>
+            <property name="isRequired">false</property>
+            <property name="dataType">boolean</property>
+            <property name="distinct">true</property>
+            <simple-property-list name="defaultValue">
+                <value type="constant">true</value>
+            </simple-property-list>
+            <list-property name="selectionList"/>
+            <property name="paramType">simple</property>
+            <property name="controlType">check-box</property>
+            <structure name="format"/>
+        </scalar-parameter>
+        <scalar-parameter name="include_school" id="606">
+            <text-property name="promptText">include_school</text-property>
+            <property name="valueType">static</property>
+            <property name="isRequired">false</property>
+            <property name="dataType">boolean</property>
+            <property name="distinct">true</property>
+            <simple-property-list name="defaultValue">
+                <value type="constant">true</value>
+            </simple-property-list>
+            <list-property name="selectionList"/>
+            <property name="paramType">simple</property>
+            <property name="controlType">check-box</property>
+            <structure name="format"/>
+        </scalar-parameter>
+        <scalar-parameter name="include_date" id="607">
+            <text-property name="promptText">include_date</text-property>
+            <property name="valueType">static</property>
+            <property name="isRequired">false</property>
+            <property name="dataType">boolean</property>
+            <property name="distinct">true</property>
+            <simple-property-list name="defaultValue">
+                <value type="constant">false</value>
+            </simple-property-list>
+            <list-property name="selectionList"/>
+            <property name="paramType">simple</property>
+            <property name="controlType">check-box</property>
+            <structure name="format"/>
+        </scalar-parameter>
+        <scalar-parameter name="include_room" id="608">
+            <text-property name="promptText">include_room</text-property>
+            <property name="valueType">static</property>
+            <property name="isRequired">false</property>
+            <property name="dataType">boolean</property>
+            <property name="distinct">true</property>
+            <simple-property-list name="defaultValue">
+                <value type="constant">true</value>
+            </simple-property-list>
+            <list-property name="selectionList"/>
+            <property name="paramType">simple</property>
+            <property name="controlType">check-box</property>
+            <structure name="format"/>
+        </scalar-parameter>
+        <scalar-parameter name="include_teacher" id="609">
+            <text-property name="promptText">include_teacher</text-property>
+            <property name="valueType">static</property>
+            <property name="isRequired">false</property>
+            <property name="dataType">boolean</property>
+            <property name="distinct">true</property>
+            <simple-property-list name="defaultValue">
+                <value type="constant">true</value>
+            </simple-property-list>
+            <list-property name="selectionList"/>
+            <property name="paramType">simple</property>
+            <property name="controlType">check-box</property>
+            <structure name="format"/>
+        </scalar-parameter>
+        <scalar-parameter name="include_grade" id="610">
+            <text-property name="promptText">include_grade</text-property>
+            <property name="valueType">static</property>
+            <property name="isRequired">false</property>
+            <property name="dataType">boolean</property>
+            <property name="distinct">true</property>
+            <simple-property-list name="defaultValue">
+                <value type="constant">true</value>
+            </simple-property-list>
+            <list-property name="selectionList"/>
+            <property name="paramType">simple</property>
+            <property name="controlType">check-box</property>
+            <structure name="format"/>
+        </scalar-parameter>
+        <scalar-parameter name="include_lunch_session" id="611">
+            <text-property name="promptText">include_lunch_session</text-property>
+            <property name="valueType">static</property>
+            <property name="isRequired">false</property>
+            <property name="dataType">boolean</property>
+            <property name="distinct">true</property>
+            <simple-property-list name="defaultValue">
+                <value type="constant">true</value>
+            </simple-property-list>
+            <list-property name="selectionList"/>
+            <property name="paramType">simple</property>
+            <property name="controlType">check-box</property>
+            <structure name="format"/>
+        </scalar-parameter>
+        <scalar-parameter name="include_item_name" id="612">
+            <text-property name="promptText">include_item_name</text-property>
+            <property name="valueType">static</property>
+            <property name="isRequired">false</property>
+            <property name="dataType">boolean</property>
+            <property name="distinct">true</property>
+            <simple-property-list name="defaultValue">
+                <value type="constant">true</value>
+            </simple-property-list>
+            <list-property name="selectionList"/>
+            <property name="paramType">simple</property>
+            <property name="controlType">check-box</property>
+            <structure name="format"/>
+        </scalar-parameter>
+        <scalar-parameter name="include_item_code" id="613">
+            <text-property name="promptText">include_item_code</text-property>
+            <property name="valueType">static</property>
+            <property name="isRequired">false</property>
+            <property name="dataType">boolean</property>
+            <property name="distinct">true</property>
+            <simple-property-list name="defaultValue">
+                <value type="constant">false</value>
+            </simple-property-list>
+            <list-property name="selectionList"/>
+            <property name="paramType">simple</property>
+            <property name="controlType">check-box</property>
+            <structure name="format"/>
+        </scalar-parameter>
+        <scalar-parameter name="include_bar_code" id="614">
+            <text-property name="promptText">include_bar_code</text-property>
+            <property name="valueType">static</property>
+            <property name="isRequired">false</property>
+            <property name="dataType">boolean</property>
+            <property name="distinct">true</property>
+            <simple-property-list name="defaultValue">
+                <value type="constant">False</value>
+            </simple-property-list>
+            <list-property name="selectionList"/>
+            <property name="paramType">simple</property>
+            <property name="controlType">check-box</property>
+            <structure name="format"/>
+        </scalar-parameter>
+        <scalar-parameter name="label_top_margin" id="666">
+            <text-property name="promptText">label_top_margin</text-property>
+            <property name="valueType">static</property>
+            <property name="dataType">string</property>
+            <property name="distinct">true</property>
+            <simple-property-list name="defaultValue">
+                <value type="constant">0.83in</value>
+            </simple-property-list>
+            <list-property name="selectionList"/>
+            <property name="paramType">simple</property>
+            <property name="controlType">text-box</property>
+            <structure name="format">
+                <property name="category">Unformatted</property>
+            </structure>
+        </scalar-parameter>
+        <scalar-parameter name="label_vertical_pitch" id="661">
+            <text-property name="promptText">label_vertical_pitch</text-property>
+            <property name="valueType">static</property>
+            <property name="dataType">string</property>
+            <property name="distinct">true</property>
+            <simple-property-list name="defaultValue">
+                <value type="constant">1.33in</value>
+            </simple-property-list>
+            <list-property name="selectionList"/>
+            <property name="paramType">simple</property>
+            <property name="controlType">text-box</property>
+            <structure name="format">
+                <property name="category">Unformatted</property>
+            </structure>
+        </scalar-parameter>
+        <scalar-parameter name="label_height" id="664">
+            <text-property name="promptText">label_height</text-property>
+            <property name="valueType">static</property>
+            <property name="dataType">string</property>
+            <property name="distinct">true</property>
+            <simple-property-list name="defaultValue">
+                <value type="constant">1.33in</value>
+            </simple-property-list>
+            <list-property name="selectionList"/>
+            <property name="paramType">simple</property>
+            <property name="controlType">text-box</property>
+            <structure name="format">
+                <property name="category">Unformatted</property>
+            </structure>
+        </scalar-parameter>
+        <scalar-parameter name="label_left_margin" id="667">
+            <text-property name="promptText">label_left_margin</text-property>
+            <property name="valueType">static</property>
+            <property name="dataType">string</property>
+            <property name="distinct">true</property>
+            <simple-property-list name="defaultValue">
+                <value type="constant">0.16in</value>
+            </simple-property-list>
+            <list-property name="selectionList"/>
+            <property name="paramType">simple</property>
+            <property name="controlType">text-box</property>
+            <structure name="format">
+                <property name="category">Unformatted</property>
+            </structure>
+        </scalar-parameter>
+        <scalar-parameter name="label_horizontal_pitch" id="662">
+            <text-property name="promptText">label_horizontal_pitch</text-property>
+            <property name="valueType">static</property>
+            <property name="dataType">string</property>
+            <property name="distinct">true</property>
+            <simple-property-list name="defaultValue">
+                <value type="constant">4.19in</value>
+            </simple-property-list>
+            <list-property name="selectionList"/>
+            <property name="paramType">simple</property>
+            <property name="controlType">text-box</property>
+            <structure name="format">
+                <property name="category">Unformatted</property>
+            </structure>
+        </scalar-parameter>
+        <scalar-parameter name="label_width" id="665">
+            <text-property name="promptText">label_width</text-property>
+            <property name="valueType">static</property>
+            <property name="dataType">string</property>
+            <property name="distinct">true</property>
+            <simple-property-list name="defaultValue">
+                <value type="constant">4in</value>
+            </simple-property-list>
+            <list-property name="selectionList"/>
+            <property name="paramType">simple</property>
+            <property name="controlType">text-box</property>
+            <structure name="format">
+                <property name="category">Unformatted</property>
+            </structure>
+        </scalar-parameter>
+        <scalar-parameter name="labels_across" id="663">
+            <text-property name="promptText">labels_across</text-property>
+            <property name="valueType">static</property>
+            <property name="dataType">integer</property>
+            <property name="distinct">true</property>
+            <simple-property-list name="defaultValue">
+                <value type="constant">2</value>
+            </simple-property-list>
+            <list-property name="selectionList"/>
+            <property name="paramType">simple</property>
+            <property name="controlType">text-box</property>
+            <structure name="format">
+                <property name="category">Unformatted</property>
+            </structure>
+        </scalar-parameter>
+        <scalar-parameter name="dev_debug" id="698">
+            <text-property name="promptText">dev_debug</text-property>
+            <property name="valueType">static</property>
+            <property name="isRequired">false</property>
+            <property name="dataType">boolean</property>
+            <property name="distinct">true</property>
+            <simple-property-list name="defaultValue">
+                <value type="constant">false</value>
+            </simple-property-list>
+            <list-property name="selectionList"/>
+            <property name="paramType">simple</property>
+            <property name="controlType">check-box</property>
+            <structure name="format"/>
+        </scalar-parameter>
+        <scalar-parameter name="dev_logfile" id="799">
+            <text-property name="promptText">dev_logfile</text-property>
+            <property name="valueType">static</property>
+            <property name="isRequired">false</property>
+            <property name="dataType">string</property>
+            <property name="distinct">true</property>
+            <list-property name="selectionList"/>
+            <property name="paramType">simple</property>
+            <property name="controlType">text-box</property>
+            <structure name="format">
+                <property name="category">Unformatted</property>
+            </structure>
+        </scalar-parameter>
+    </parameters>
+    <data-sources>
+        <oda-data-source extensionID="org.eclipse.birt.report.data.oda.jdbc" name="orderlunches" id="351">
+            <list-property name="privateDriverProperties">
+                <ex-property>
+                    <name>contentBidiFormatStr</name>
+                    <value>ILYNN</value>
+                </ex-property>
+                <ex-property>
+                    <name>metadataBidiFormatStr</name>
+                    <value>ILYNN</value>
+                </ex-property>
+                <ex-property>
+                    <name>disabledMetadataBidiFormatStr</name>
+                </ex-property>
+                <ex-property>
+                    <name>disabledContentBidiFormatStr</name>
+                </ex-property>
+            </list-property>
+            <property name="odaDriverClass">com.mysql.jdbc.Driver</property>
+            <property name="odaURL">jdbc:mysql://awsdb.orderlunches.com:3306/innovent?noDatetimeStringSync=true</property>
+            <property name="odaUser">innovent</property>
+            <encrypted-property name="odaPassword" encryptionID="base64">YmlydDIwMTI=</encrypted-property>
+            <property name="odaJndiName">java:comp/env/jdbc/orderlunches</property>
+        </oda-data-source>
+    </data-sources>
+    <data-sets>
+        <oda-data-set extensionID="org.eclipse.birt.report.data.oda.jdbc.JdbcSelectDataSet" name="Report" id="28">
+            <list-property name="computedColumns">
+                <structure>
+                    <property name="name">grouping_value</property>
+                    <expression name="expression">var ol_grouping_value;
+switch(params["ml_group_by_new"].value + "") {
+	case "room":
+		ol_grouping_value = row["roomname"] + " " + row["roomnum"];
+		break;
+	case "teacher":
+		ol_grouping_value = row["teachername"];
+		break;
+	case "grade":
+		ol_grouping_value = row["gradename"];
+		break;
+	case "ls":
+		ol_grouping_value = row["lunchsession"];
+		break;
+	case "student":
+		ol_grouping_value = row["student_last"] + " " + row["student_first"];
+		break;
+	case "item":
+		ol_grouping_value = row["translated_names"];
+		break;
+	default:
+		ol_grouping_value = "";
+}
+ol_grouping_value</expression>
+                    <property name="dataType">string</property>
+                </structure>
+                <structure>
+                    <property name="name">page_break_value</property>
+                    <expression name="expression">var ol_grouping_value = row["grouping_value"];
+var ol_page_break_value;
+var by_day = params["by_day"].value;
+var menu_date = Formatter.format(row["menu_date"], "yyyyMMddhhss");
+switch(params["ml_page_break"].value + "") {
+	case "school":
+		ol_page_break_value = row["schoolname"] + "";
+		break;
+	case "day":
+		if(by_day)
+			ol_page_break_value = row["schoolname"] + " " + menu_date;
+		else
+			ol_page_break_value = row["schoolname"] + " " + ol_grouping_value + " " + menu_date;
+		break;
+	case "grouping":
+		if(by_day)
+			ol_page_break_value = row["schoolname"] + " " + menu_date + " " + ol_grouping_value;
+		else
+			ol_page_break_value = row["schoolname"] + " " + ol_grouping_value;
+		break;
+	default:
+		ol_page_break_value = null;
+}
+ol_page_break_value</expression>
+                    <property name="dataType">string</property>
+                </structure>
+                <structure>
+                    <property name="name">col</property>
+                    <expression name="expression">// var out = Packages.java.lang.System.out;
+// out.println("--- compute col");
+// out.println("page_break_value = " + row["page_break_value"]);
+// out.println("col = " + ol_label_col);
+// out.println("row = " + ol_label_row);
+// out.println("page = " + ol_label_page);
+var page_break = ol_last_page_break_value != null &amp;&amp; ol_last_page_break_value != row["page_break_value"];
+// out.println("page_break = " + page_break);
+ol_label_col++;
+if(ol_label_col > params["labels_across"].value || page_break) {
+	// out.println("incrementing row");
+	ol_label_col = 1;
+	ol_label_row++;
+	if(page_break) {
+		// out.println("incrementing page");
+		ol_label_page++;
+	}
+}
+ol_last_page_break_value = row["page_break_value"];
+// out.println("finish:");
+// out.println("col = " + ol_label_col);
+// out.println("row = " + ol_label_row);
+// out.println("page = " + ol_label_page);
+ol_label_col - 1</expression>
+                    <property name="dataType">integer</property>
+                </structure>
+                <structure>
+                    <property name="name">row</property>
+                    <expression name="expression">// force col to be computed first
+var dummy = row["col"]; 
+// var out = Packages.java.lang.System.out;
+// out.println("--- compute row = " + ol_label_row);
+ol_label_row</expression>
+                    <property name="dataType">integer</property>
+                </structure>
+                <structure>
+                    <property name="name">page</property>
+                    <expression name="expression">// force col to be computed first
+var dummy = row["col"];
+// var out = Packages.java.lang.System.out;
+// out.println("--- compute page = " + ol_label_page);
+ol_label_page</expression>
+                    <property name="dataType">integer</property>
+                </structure>
+                <structure>
+                    <property name="name">translated_names</property>
+                    <expression name="expression">var markdowns = row["markdown_names"].split(",");
+var quantities = row["order_quantities"].split(","); 
+var names = row["item_name"].split(",");
+var output = [];
+for(var i = 0; i &lt; names.length; i++) {
+	var itemName = names[i] + "";
+	var markdown = markdowns[i] * 1;
+	var quantity = quantities[i] * 1;
+	var newName = applyMarkDown(itemName, markdown);
+	if(quantity > 1) {
+		newName += " &lt;strong>QTY " + quantity + "&lt;strong>";
+	}
+	output.push(newName);
+}
+output.join(",")</expression>
+                    <property name="dataType">string</property>
+                </structure>
+            </list-property>
+            <list-property name="parameters">
+                <structure>
+                    <property name="name">dbname</property>
+                    <property name="paramName">dbname</property>
+                    <property name="dataType">string</property>
+                    <property name="position">1</property>
+                    <property name="isInput">true</property>
+                    <property name="isOutput">false</property>
+                </structure>
+                <structure>
+                    <property name="name">login_id</property>
+                    <property name="paramName">login_id</property>
+                    <property name="dataType">integer</property>
+                    <property name="position">2</property>
+                    <property name="isInput">true</property>
+                    <property name="isOutput">false</property>
+                </structure>
+                <structure>
+                    <property name="name">multi_school_id</property>
+                    <property name="dataType">string</property>
+                    <property name="position">3</property>
+                    <expression name="defaultValue" type="javascript">getMultiNumericParam("school")</expression>
+                    <property name="isInput">true</property>
+                    <property name="isOutput">false</property>
+                </structure>
+                <structure>
+                    <property name="name">multi_room_id</property>
+                    <property name="dataType">string</property>
+                    <property name="position">4</property>
+                    <expression name="defaultValue" type="javascript">getMultiNumericParam("room")</expression>
+                    <property name="isInput">true</property>
+                    <property name="isOutput">false</property>
+                </structure>
+                <structure>
+                    <property name="name">multi_teacher_id</property>
+                    <property name="dataType">string</property>
+                    <property name="position">5</property>
+                    <expression name="defaultValue" type="javascript">getMultiStringParam("teacher")</expression>
+                    <property name="isInput">true</property>
+                    <property name="isOutput">false</property>
+                </structure>
+                <structure>
+                    <property name="name">multi_lunch_session</property>
+                    <property name="dataType">string</property>
+                    <property name="position">6</property>
+                    <expression name="defaultValue" type="javascript">getMultiStringParam("lunch_session")</expression>
+                    <property name="isInput">true</property>
+                    <property name="isOutput">false</property>
+                </structure>
+                <structure>
+                    <property name="name">grade</property>
+                    <property name="dataType">string</property>
+                    <property name="position">7</property>
+                    <expression name="defaultValue" type="javascript">getMultiStringParam("grade")</expression>
+                    <property name="isInput">true</property>
+                    <property name="isOutput">false</property>
+                </structure>
+                <structure>
+                    <property name="name">vendor</property>
+                    <property name="dataType">string</property>
+                    <property name="position">8</property>
+                    <expression name="defaultValue" type="javascript">getMultiStringParam("vendor")</expression>
+                    <property name="isInput">true</property>
+                    <property name="isOutput">false</property>
+                </structure>
+                <structure>
+                    <property name="name">menu_cycle</property>
+                    <property name="dataType">string</property>
+                    <property name="position">9</property>
+                    <expression name="defaultValue" type="javascript">getMultiNumericParam("menu_cycle")</expression>
+                    <property name="isInput">true</property>
+                    <property name="isOutput">false</property>
+                </structure>
+                <structure>
+                    <property name="name">start_date</property>
+                    <property name="paramName">start_date</property>
+                    <property name="dataType">date</property>
+                    <property name="position">10</property>
+                    <property name="isInput">true</property>
+                    <property name="isOutput">false</property>
+                </structure>
+                <structure>
+                    <property name="name">end_date</property>
+                    <property name="paramName">end_date</property>
+                    <property name="dataType">date</property>
+                    <property name="position">11</property>
+                    <property name="isInput">true</property>
+                    <property name="isOutput">false</property>
+                </structure>
+                <structure>
+                    <property name="name">ml_group_by_new</property>
+                    <property name="paramName">ml_group_by_new</property>
+                    <property name="dataType">string</property>
+                    <property name="position">12</property>
+                    <expression name="defaultValue" type="javascript">""</expression>
+                    <property name="isInput">true</property>
+                    <property name="isOutput">false</property>
+                </structure>
+                <structure>
+                    <property name="name">by_day</property>
+                    <property name="paramName">by_day</property>
+                    <property name="dataType">boolean</property>
+                    <property name="position">13</property>
+                    <expression name="defaultValue" type="javascript">false</expression>
+                    <property name="isInput">true</property>
+                    <property name="isOutput">false</property>
+                </structure>
+                <structure>
+                    <property name="name">use_item_code</property>
+                    <property name="paramName">include_item_code</property>
+                    <property name="dataType">boolean</property>
+                    <property name="position">14</property>
+                    <expression name="defaultValue" type="javascript">params["include_item_code"].value</expression>
+                    <property name="isInput">true</property>
+                    <property name="isOutput">false</property>
+                </structure>
+                <structure>
+                    <property name="name">vendor_items_only</property>
+                    <property name="paramName">vendor_items_only</property>
+                    <property name="dataType">boolean</property>
+                    <property name="position">15</property>
+                    <expression name="defaultValue" type="javascript">false</expression>
+                    <property name="isInput">true</property>
+                    <property name="isOutput">false</property>
+                </structure>
+                <structure>
+                    <property name="name">student_id_only</property>
+                    <property name="paramName">include_bar_code</property>
+                    <property name="dataType">boolean</property>
+                    <property name="position">16</property>
+                    <property name="isInput">true</property>
+                    <property name="isOutput">false</property>
+                </structure>
+            </list-property>
+            <structure name="cachedMetaData">
+                <list-property name="resultSet">
+                    <structure>
+                        <property name="position">1</property>
+                        <property name="name">menu_date</property>
+                        <property name="dataType">date-time</property>
+                    </structure>
+                    <structure>
+                        <property name="position">2</property>
+                        <property name="name">student_first</property>
+                        <property name="dataType">string</property>
+                    </structure>
+                    <structure>
+                        <property name="position">3</property>
+                        <property name="name">student_last</property>
+                        <property name="dataType">string</property>
+                    </structure>
+                    <structure>
+                        <property name="position">4</property>
+                        <property name="name">student_id</property>
+                        <property name="dataType">integer</property>
+                    </structure>
+                    <structure>
+                        <property name="position">5</property>
+                        <property name="name">student_id_number</property>
+                        <property name="dataType">string</property>
+                    </structure>
+                    <structure>
+                        <property name="position">6</property>
+                        <property name="name">lunchsession</property>
+                        <property name="dataType">string</property>
+                    </structure>
+                    <structure>
+                        <property name="position">7</property>
+                        <property name="name">schoolname</property>
+                        <property name="dataType">string</property>
+                    </structure>
+                    <structure>
+                        <property name="position">8</property>
+                        <property name="name">roomname</property>
+                        <property name="dataType">string</property>
+                    </structure>
+                    <structure>
+                        <property name="position">9</property>
+                        <property name="name">roomnum</property>
+                        <property name="dataType">integer</property>
+                    </structure>
+                    <structure>
+                        <property name="position">10</property>
+                        <property name="name">teachername</property>
+                        <property name="dataType">string</property>
+                    </structure>
+                    <structure>
+                        <property name="position">11</property>
+                        <property name="name">gradename</property>
+                        <property name="dataType">string</property>
+                    </structure>
+                    <structure>
+                        <property name="position">12</property>
+                        <property name="name">item_name</property>
+                        <property name="dataType">string</property>
+                    </structure>
+                    <structure>
+                        <property name="position">13</property>
+                        <property name="name">markdown_names</property>
+                        <property name="dataType">string</property>
+                    </structure>
+                    <structure>
+                        <property name="position">14</property>
+                        <property name="name">order_quantities</property>
+                        <property name="dataType">string</property>
+                    </structure>
+                    <structure>
+                        <property name="position">15</property>
+                        <property name="name">vendor_codes</property>
+                        <property name="dataType">string</property>
+                    </structure>
+                    <structure>
+                        <property name="position">16</property>
+                        <property name="name">grouping_value</property>
+                        <property name="dataType">string</property>
+                    </structure>
+                    <structure>
+                        <property name="position">17</property>
+                        <property name="name">page_break_value</property>
+                        <property name="dataType">string</property>
+                    </structure>
+                    <structure>
+                        <property name="position">18</property>
+                        <property name="name">col</property>
+                        <property name="dataType">integer</property>
+                    </structure>
+                    <structure>
+                        <property name="position">19</property>
+                        <property name="name">row</property>
+                        <property name="dataType">integer</property>
+                    </structure>
+                    <structure>
+                        <property name="position">20</property>
+                        <property name="name">page</property>
+                        <property name="dataType">integer</property>
+                    </structure>
+                    <structure>
+                        <property name="position">21</property>
+                        <property name="name">translated_names</property>
+                        <property name="dataType">string</property>
+                    </structure>
+                </list-property>
+            </structure>
+            <method name="beforeOpen"><![CDATA[ol_label_col = 0;
+ol_label_row = 0;
+ol_label_page = 0;
+ol_last_page_break_value = null;
+]]></method>
+            <property name="dataSource">orderlunches</property>
+            <list-property name="resultSet">
+                <structure>
+                    <property name="position">1</property>
+                    <property name="name">menu_date</property>
+                    <property name="nativeName">menu_date</property>
+                    <property name="dataType">date-time</property>
+                </structure>
+                <structure>
+                    <property name="position">2</property>
+                    <property name="name">student_first</property>
+                    <property name="nativeName">student_first</property>
+                    <property name="dataType">string</property>
+                </structure>
+                <structure>
+                    <property name="position">3</property>
+                    <property name="name">student_last</property>
+                    <property name="nativeName">student_last</property>
+                    <property name="dataType">string</property>
+                </structure>
+                <structure>
+                    <property name="position">4</property>
+                    <property name="name">student_id</property>
+                    <property name="nativeName">student_id</property>
+                    <property name="dataType">integer</property>
+                </structure>
+                <structure>
+                    <property name="position">5</property>
+                    <property name="name">student_id_number</property>
+                    <property name="nativeName">student_id_number</property>
+                    <property name="dataType">string</property>
+                </structure>
+                <structure>
+                    <property name="position">6</property>
+                    <property name="name">lunchsession</property>
+                    <property name="nativeName">lunchsession</property>
+                    <property name="dataType">string</property>
+                </structure>
+                <structure>
+                    <property name="position">7</property>
+                    <property name="name">schoolname</property>
+                    <property name="nativeName">schoolname</property>
+                    <property name="dataType">string</property>
+                </structure>
+                <structure>
+                    <property name="position">8</property>
+                    <property name="name">roomname</property>
+                    <property name="nativeName">roomname</property>
+                    <property name="dataType">string</property>
+                </structure>
+                <structure>
+                    <property name="position">9</property>
+                    <property name="name">roomnum</property>
+                    <property name="nativeName">roomnum</property>
+                    <property name="dataType">integer</property>
+                </structure>
+                <structure>
+                    <property name="position">10</property>
+                    <property name="name">teachername</property>
+                    <property name="nativeName">teachername</property>
+                    <property name="dataType">string</property>
+                </structure>
+                <structure>
+                    <property name="position">11</property>
+                    <property name="name">gradename</property>
+                    <property name="nativeName">gradename</property>
+                    <property name="dataType">string</property>
+                </structure>
+                <structure>
+                    <property name="position">12</property>
+                    <property name="name">item_name</property>
+                    <property name="nativeName">item_name</property>
+                    <property name="dataType">string</property>
+                </structure>
+                <structure>
+                    <property name="position">13</property>
+                    <property name="name">markdown_names</property>
+                    <property name="nativeName">markdown_names</property>
+                    <property name="dataType">string</property>
+                </structure>
+                <structure>
+                    <property name="position">14</property>
+                    <property name="name">order_quantities</property>
+                    <property name="nativeName">order_quantities</property>
+                    <property name="dataType">string</property>
+                </structure>
+                <structure>
+                    <property name="position">15</property>
+                    <property name="name">vendor_codes</property>
+                    <property name="nativeName">vendor_codes</property>
+                    <property name="dataType">string</property>
+                </structure>
+            </list-property>
+            <xml-property name="queryText"><![CDATA[call innovent.menu_labels_v8( 
+/*	in _dbname text */ ?,
+/*	in _login_id int */ ?,
+/*	in _school_id text - multi-select numeric */ ?,
+/*	in _room_id text - multi-select numeric */ ?,
+/*	in _teacher text - multi-select text */ ?,
+/*	in _lunch_session text - multi-select text */ ?,
+/*	in _grade text - multi-select text */ ?,
+/*	in _vendor text - multi-select text */ ?,
+/*	in _menu_cycle text - multi-select numeric */ ?,
+/*	in _start_date datetime */ ?,
+/*	in _end_date datetime */ ?,
+/*	in _grouping text - room, teacher, grade, ls */ ?,
+/*	in _by_day boolean - if true, group by day before grouping */ ?,
+/*	in _use_item_code boolean - if true, return item codes instead of names */ ?,
+/*	in _vendor_items_only boolean - if true, only show selected vendors items */ ?,
+/*  in _student_id_only boolean - if true, only show students that have ids */ ?)]]></xml-property>
+            <xml-property name="designerValues"><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
+<model:DesignValues xmlns:design="http://www.eclipse.org/datatools/connectivity/oda/design" xmlns:model="http://www.eclipse.org/birt/report/model/adapter/odaModel">
+  <Version>2.0</Version>
+  <design:ResultSets derivedMetaData="true">
+    <design:resultSetDefinitions>
+      <design:resultSetColumns>
+        <design:resultColumnDefinitions>
+          <design:attributes>
+            <design:identifier>
+              <design:name>menu_date</design:name>
+              <design:position>1</design:position>
+            </design:identifier>
+            <design:nativeDataTypeCode>93</design:nativeDataTypeCode>
+            <design:precision>19</design:precision>
+            <design:scale>0</design:scale>
+            <design:nullability>Nullable</design:nullability>
+            <design:uiHints>
+              <design:displayName>menu_date</design:displayName>
+            </design:uiHints>
+          </design:attributes>
+          <design:usageHints>
+            <design:label>menu_date</design:label>
+            <design:formattingHints>
+              <design:displaySize>19</design:displaySize>
+            </design:formattingHints>
+          </design:usageHints>
+        </design:resultColumnDefinitions>
+        <design:resultColumnDefinitions>
+          <design:attributes>
+            <design:identifier>
+              <design:name>cycle_id</design:name>
+              <design:position>2</design:position>
+            </design:identifier>
+            <design:nativeDataTypeCode>4</design:nativeDataTypeCode>
+            <design:precision>11</design:precision>
+            <design:scale>0</design:scale>
+            <design:nullability>Nullable</design:nullability>
+            <design:uiHints>
+              <design:displayName>cycle_id</design:displayName>
+            </design:uiHints>
+          </design:attributes>
+          <design:usageHints>
+            <design:label>cycle_id</design:label>
+            <design:formattingHints>
+              <design:displaySize>11</design:displaySize>
+            </design:formattingHints>
+          </design:usageHints>
+        </design:resultColumnDefinitions>
+        <design:resultColumnDefinitions>
+          <design:attributes>
+            <design:identifier>
+              <design:name>item_type</design:name>
+              <design:position>3</design:position>
+            </design:identifier>
+            <design:nativeDataTypeCode>4</design:nativeDataTypeCode>
+            <design:precision>11</design:precision>
+            <design:scale>0</design:scale>
+            <design:nullability>Nullable</design:nullability>
+            <design:uiHints>
+              <design:displayName>item_type</design:displayName>
+            </design:uiHints>
+          </design:attributes>
+          <design:usageHints>
+            <design:label>item_type</design:label>
+            <design:formattingHints>
+              <design:displaySize>11</design:displaySize>
+            </design:formattingHints>
+          </design:usageHints>
+        </design:resultColumnDefinitions>
+        <design:resultColumnDefinitions>
+          <design:attributes>
+            <design:identifier>
+              <design:name>item_name</design:name>
+              <design:position>4</design:position>
+            </design:identifier>
+            <design:nativeDataTypeCode>12</design:nativeDataTypeCode>
+            <design:precision>65535</design:precision>
+            <design:scale>0</design:scale>
+            <design:nullability>Nullable</design:nullability>
+            <design:uiHints>
+              <design:displayName>item_name</design:displayName>
+            </design:uiHints>
+          </design:attributes>
+          <design:usageHints>
+            <design:label>item_name</design:label>
+            <design:formattingHints>
+              <design:displaySize>65535</design:displaySize>
+            </design:formattingHints>
+          </design:usageHints>
+        </design:resultColumnDefinitions>
+        <design:resultColumnDefinitions>
+          <design:attributes>
+            <design:identifier>
+              <design:name>quantity</design:name>
+              <design:position>5</design:position>
+            </design:identifier>
+            <design:nativeDataTypeCode>4</design:nativeDataTypeCode>
+            <design:precision>11</design:precision>
+            <design:scale>0</design:scale>
+            <design:nullability>Nullable</design:nullability>
+            <design:uiHints>
+              <design:displayName>quantity</design:displayName>
+            </design:uiHints>
+          </design:attributes>
+          <design:usageHints>
+            <design:label>quantity</design:label>
+            <design:formattingHints>
+              <design:displaySize>11</design:displaySize>
+            </design:formattingHints>
+          </design:usageHints>
+        </design:resultColumnDefinitions>
+        <design:resultColumnDefinitions>
+          <design:attributes>
+            <design:identifier>
+              <design:name>price_type</design:name>
+              <design:position>6</design:position>
+            </design:identifier>
+            <design:nativeDataTypeCode>4</design:nativeDataTypeCode>
+            <design:precision>11</design:precision>
+            <design:scale>0</design:scale>
+            <design:nullability>Nullable</design:nullability>
+            <design:uiHints>
+              <design:displayName>price_type</design:displayName>
+            </design:uiHints>
+          </design:attributes>
+          <design:usageHints>
+            <design:label>price_type</design:label>
+            <design:formattingHints>
+              <design:displaySize>11</design:displaySize>
+            </design:formattingHints>
+          </design:usageHints>
+        </design:resultColumnDefinitions>
+        <design:resultColumnDefinitions>
+          <design:attributes>
+            <design:identifier>
+              <design:name>item_id</design:name>
+              <design:position>7</design:position>
+            </design:identifier>
+            <design:nativeDataTypeCode>4</design:nativeDataTypeCode>
+            <design:precision>11</design:precision>
+            <design:scale>0</design:scale>
+            <design:nullability>Nullable</design:nullability>
+            <design:uiHints>
+              <design:displayName>item_id</design:displayName>
+            </design:uiHints>
+          </design:attributes>
+          <design:usageHints>
+            <design:label>item_id</design:label>
+            <design:formattingHints>
+              <design:displaySize>11</design:displaySize>
+            </design:formattingHints>
+          </design:usageHints>
+        </design:resultColumnDefinitions>
+        <design:resultColumnDefinitions>
+          <design:attributes>
+            <design:identifier>
+              <design:name>order_id</design:name>
+              <design:position>8</design:position>
+            </design:identifier>
+            <design:nativeDataTypeCode>12</design:nativeDataTypeCode>
+            <design:precision>64</design:precision>
+            <design:scale>0</design:scale>
+            <design:nullability>Nullable</design:nullability>
+            <design:uiHints>
+              <design:displayName>order_id</design:displayName>
+            </design:uiHints>
+          </design:attributes>
+          <design:usageHints>
+            <design:label>order_id</design:label>
+            <design:formattingHints>
+              <design:displaySize>64</design:displaySize>
+            </design:formattingHints>
+          </design:usageHints>
+        </design:resultColumnDefinitions>
+        <design:resultColumnDefinitions>
+          <design:attributes>
+            <design:identifier>
+              <design:name>teacher</design:name>
+              <design:position>9</design:position>
+            </design:identifier>
+            <design:nativeDataTypeCode>12</design:nativeDataTypeCode>
+            <design:precision>65535</design:precision>
+            <design:scale>0</design:scale>
+            <design:nullability>NotNullable</design:nullability>
+            <design:uiHints>
+              <design:displayName>teacher</design:displayName>
+            </design:uiHints>
+          </design:attributes>
+          <design:usageHints>
+            <design:label>teacher</design:label>
+            <design:formattingHints>
+              <design:displaySize>65535</design:displaySize>
+            </design:formattingHints>
+          </design:usageHints>
+        </design:resultColumnDefinitions>
+        <design:resultColumnDefinitions>
+          <design:attributes>
+            <design:identifier>
+              <design:name>grade</design:name>
+              <design:position>10</design:position>
+            </design:identifier>
+            <design:nativeDataTypeCode>12</design:nativeDataTypeCode>
+            <design:precision>65535</design:precision>
+            <design:scale>0</design:scale>
+            <design:nullability>NotNullable</design:nullability>
+            <design:uiHints>
+              <design:displayName>grade</design:displayName>
+            </design:uiHints>
+          </design:attributes>
+          <design:usageHints>
+            <design:label>grade</design:label>
+            <design:formattingHints>
+              <design:displaySize>65535</design:displaySize>
+            </design:formattingHints>
+          </design:usageHints>
+        </design:resultColumnDefinitions>
+        <design:resultColumnDefinitions>
+          <design:attributes>
+            <design:identifier>
+              <design:name>lunch_session</design:name>
+              <design:position>11</design:position>
+            </design:identifier>
+            <design:nativeDataTypeCode>12</design:nativeDataTypeCode>
+            <design:precision>65535</design:precision>
+            <design:scale>0</design:scale>
+            <design:nullability>NotNullable</design:nullability>
+            <design:uiHints>
+              <design:displayName>lunch_session</design:displayName>
+            </design:uiHints>
+          </design:attributes>
+          <design:usageHints>
+            <design:label>lunch_session</design:label>
+            <design:formattingHints>
+              <design:displaySize>65535</design:displaySize>
+            </design:formattingHints>
+          </design:usageHints>
+        </design:resultColumnDefinitions>
+        <design:resultColumnDefinitions>
+          <design:attributes>
+            <design:identifier>
+              <design:name>room_id</design:name>
+              <design:position>12</design:position>
+            </design:identifier>
+            <design:nativeDataTypeCode>4</design:nativeDataTypeCode>
+            <design:precision>11</design:precision>
+            <design:scale>0</design:scale>
+            <design:nullability>NotNullable</design:nullability>
+            <design:uiHints>
+              <design:displayName>room_id</design:displayName>
+            </design:uiHints>
+          </design:attributes>
+          <design:usageHints>
+            <design:label>room_id</design:label>
+            <design:formattingHints>
+              <design:displaySize>11</design:displaySize>
+            </design:formattingHints>
+          </design:usageHints>
+        </design:resultColumnDefinitions>
+        <design:resultColumnDefinitions>
+          <design:attributes>
+            <design:identifier>
+              <design:name>room_name</design:name>
+              <design:position>13</design:position>
+            </design:identifier>
+            <design:nativeDataTypeCode>12</design:nativeDataTypeCode>
+            <design:precision>65535</design:precision>
+            <design:scale>0</design:scale>
+            <design:nullability>NotNullable</design:nullability>
+            <design:uiHints>
+              <design:displayName>room_name</design:displayName>
+            </design:uiHints>
+          </design:attributes>
+          <design:usageHints>
+            <design:label>room_name</design:label>
+            <design:formattingHints>
+              <design:displaySize>65535</design:displaySize>
+            </design:formattingHints>
+          </design:usageHints>
+        </design:resultColumnDefinitions>
+        <design:resultColumnDefinitions>
+          <design:attributes>
+            <design:identifier>
+              <design:name>student_first</design:name>
+              <design:position>14</design:position>
+            </design:identifier>
+            <design:nativeDataTypeCode>12</design:nativeDataTypeCode>
+            <design:precision>64</design:precision>
+            <design:scale>0</design:scale>
+            <design:nullability>NotNullable</design:nullability>
+            <design:uiHints>
+              <design:displayName>student_first</design:displayName>
+            </design:uiHints>
+          </design:attributes>
+          <design:usageHints>
+            <design:label>student_first</design:label>
+            <design:formattingHints>
+              <design:displaySize>64</design:displaySize>
+            </design:formattingHints>
+          </design:usageHints>
+        </design:resultColumnDefinitions>
+        <design:resultColumnDefinitions>
+          <design:attributes>
+            <design:identifier>
+              <design:name>student_last</design:name>
+              <design:position>15</design:position>
+            </design:identifier>
+            <design:nativeDataTypeCode>12</design:nativeDataTypeCode>
+            <design:precision>64</design:precision>
+            <design:scale>0</design:scale>
+            <design:nullability>NotNullable</design:nullability>
+            <design:uiHints>
+              <design:displayName>student_last</design:displayName>
+            </design:uiHints>
+          </design:attributes>
+          <design:usageHints>
+            <design:label>student_last</design:label>
+            <design:formattingHints>
+              <design:displaySize>64</design:displaySize>
+            </design:formattingHints>
+          </design:usageHints>
+        </design:resultColumnDefinitions>
+        <design:resultColumnDefinitions>
+          <design:attributes>
+            <design:identifier>
+              <design:name>student_id</design:name>
+              <design:position>16</design:position>
+            </design:identifier>
+            <design:nativeDataTypeCode>4</design:nativeDataTypeCode>
+            <design:precision>11</design:precision>
+            <design:scale>0</design:scale>
+            <design:nullability>NotNullable</design:nullability>
+            <design:uiHints>
+              <design:displayName>student_id</design:displayName>
+            </design:uiHints>
+          </design:attributes>
+          <design:usageHints>
+            <design:label>student_id</design:label>
+            <design:formattingHints>
+              <design:displaySize>11</design:displaySize>
+            </design:formattingHints>
+          </design:usageHints>
+        </design:resultColumnDefinitions>
+        <design:resultColumnDefinitions>
+          <design:attributes>
+            <design:identifier>
+              <design:name>mp</design:name>
+              <design:position>18</design:position>
+            </design:identifier>
+            <design:nativeDataTypeCode>-6</design:nativeDataTypeCode>
+            <design:precision>4</design:precision>
+            <design:scale>0</design:scale>
+            <design:nullability>Nullable</design:nullability>
+            <design:uiHints>
+              <design:displayName>mp</design:displayName>
+            </design:uiHints>
+          </design:attributes>
+          <design:usageHints>
+            <design:label>mp</design:label>
+            <design:formattingHints>
+              <design:displaySize>4</design:displaySize>
+            </design:formattingHints>
+          </design:usageHints>
+        </design:resultColumnDefinitions>
+        <design:resultColumnDefinitions>
+          <design:attributes>
+            <design:identifier>
+              <design:name>Cycle_date</design:name>
+              <design:position>19</design:position>
+            </design:identifier>
+            <design:nativeDataTypeCode>12</design:nativeDataTypeCode>
+            <design:precision>8192</design:precision>
+            <design:scale>0</design:scale>
+            <design:nullability>Nullable</design:nullability>
+            <design:uiHints>
+              <design:displayName>Cycle_date</design:displayName>
+            </design:uiHints>
+          </design:attributes>
+          <design:usageHints>
+            <design:label>Cycle_date</design:label>
+            <design:formattingHints>
+              <design:displaySize>8192</design:displaySize>
+            </design:formattingHints>
+          </design:usageHints>
+        </design:resultColumnDefinitions>
+        <design:resultColumnDefinitions>
+          <design:attributes>
+            <design:identifier>
+              <design:name>lunch_session_sort</design:name>
+              <design:position>20</design:position>
+            </design:identifier>
+            <design:nativeDataTypeCode>12</design:nativeDataTypeCode>
+            <design:precision>65535</design:precision>
+            <design:scale>0</design:scale>
+            <design:nullability>Nullable</design:nullability>
+            <design:uiHints>
+              <design:displayName>lunch_session_sort</design:displayName>
+            </design:uiHints>
+          </design:attributes>
+          <design:usageHints>
+            <design:label>lunch_session_sort</design:label>
+            <design:formattingHints>
+              <design:displaySize>65535</design:displaySize>
+            </design:formattingHints>
+          </design:usageHints>
+        </design:resultColumnDefinitions>
+      </design:resultSetColumns>
+      <design:criteria/>
+    </design:resultSetDefinitions>
+  </design:ResultSets>
+</model:DesignValues>]]></xml-property>
+        </oda-data-set>
+    </data-sets>
+    <styles>
+        <style name="report" id="4">
+            <property name="fontFamily">sans-serif</property>
+            <property name="fontSize">10pt</property>
+        </style>
+        <style name="crosstab-cell" id="5">
+            <property name="borderBottomColor">#CCCCCC</property>
+            <property name="borderBottomStyle">solid</property>
+            <property name="borderBottomWidth">1pt</property>
+            <property name="borderLeftColor">#CCCCCC</property>
+            <property name="borderLeftStyle">solid</property>
+            <property name="borderLeftWidth">1pt</property>
+            <property name="borderRightColor">#CCCCCC</property>
+            <property name="borderRightStyle">solid</property>
+            <property name="borderRightWidth">1pt</property>
+            <property name="borderTopColor">#CCCCCC</property>
+            <property name="borderTopStyle">solid</property>
+            <property name="borderTopWidth">1pt</property>
+        </style>
+        <style name="crosstab" id="6">
+            <property name="borderBottomColor">#CCCCCC</property>
+            <property name="borderBottomStyle">solid</property>
+            <property name="borderBottomWidth">1pt</property>
+            <property name="borderLeftColor">#CCCCCC</property>
+            <property name="borderLeftStyle">solid</property>
+            <property name="borderLeftWidth">1pt</property>
+            <property name="borderRightColor">#CCCCCC</property>
+            <property name="borderRightStyle">solid</property>
+            <property name="borderRightWidth">1pt</property>
+            <property name="borderTopColor">#CCCCCC</property>
+            <property name="borderTopStyle">solid</property>
+            <property name="borderTopWidth">1pt</property>
+        </style>
+    </styles>
+    <page-setup>
+        <simple-master-page name="Simple MasterPage" id="2">
+            <property name="headerHeight">0in</property>
+            <property name="footerHeight">0in</property>
+        </simple-master-page>
+    </page-setup>
+    <body>
+        <grid id="918">
+            <list-property name="visibility">
+                <structure>
+                    <property name="format">all</property>
+                    <expression name="valueExpr" type="javascript">!params["dev_debug"].value</expression>
+                </structure>
+            </list-property>
+            <list-property name="boundDataColumns">
+                <structure>
+                    <property name="name">dbname</property>
+                    <expression name="expression" type="javascript">displayParam(params["dbname"].value)</expression>
+                    <property name="dataType">string</property>
+                    <property name="allowExport">true</property>
+                </structure>
+                <structure>
+                    <property name="name">login_id</property>
+                    <expression name="expression" type="javascript">displayParam(params["login_id"].value)</expression>
+                    <property name="dataType">string</property>
+                    <property name="allowExport">true</property>
+                </structure>
+                <structure>
+                    <property name="name">multi_school_all</property>
+                    <expression name="expression" type="javascript">displayParam(params["multi_school_all"].value)</expression>
+                    <property name="dataType">boolean</property>
+                    <property name="allowExport">true</property>
+                </structure>
+                <structure>
+                    <property name="name">multi_school_id</property>
+                    <expression name="expression" type="javascript">displayParam(params["multi_school_id"].value)</expression>
+                    <property name="dataType">string</property>
+                    <property name="allowExport">true</property>
+                </structure>
+                <structure>
+                    <property name="name">multi_room_all</property>
+                    <expression name="expression" type="javascript">displayParam(params["multi_room_all"].value)</expression>
+                    <property name="dataType">boolean</property>
+                    <property name="allowExport">true</property>
+                </structure>
+                <structure>
+                    <property name="name">multi_room_id</property>
+                    <expression name="expression" type="javascript">displayParam(params["multi_room_id"].value)</expression>
+                    <property name="dataType">string</property>
+                    <property name="allowExport">true</property>
+                </structure>
+                <structure>
+                    <property name="name">multi_teacher_all</property>
+                    <expression name="expression" type="javascript">displayParam(params["multi_teacher_all"].value)</expression>
+                    <property name="dataType">boolean</property>
+                    <property name="allowExport">true</property>
+                </structure>
+                <structure>
+                    <property name="name">multi_teacher_id</property>
+                    <expression name="expression" type="javascript">displayParam(params["multi_teacher_id"].value)</expression>
+                    <property name="dataType">string</property>
+                    <property name="allowExport">true</property>
+                </structure>
+                <structure>
+                    <property name="name">multi_lunch_session_all</property>
+                    <expression name="expression" type="javascript">displayParam(params["multi_lunch_session_all"].value)</expression>
+                    <property name="dataType">boolean</property>
+                    <property name="allowExport">true</property>
+                </structure>
+                <structure>
+                    <property name="name">multi_lunch_session_id</property>
+                    <expression name="expression" type="javascript">displayParam(params["multi_lunch_session_id"].value)</expression>
+                    <property name="dataType">string</property>
+                    <property name="allowExport">true</property>
+                </structure>
+                <structure>
+                    <property name="name">multi_grade_all</property>
+                    <expression name="expression" type="javascript">displayParam(params["multi_grade_all"].value)</expression>
+                    <property name="dataType">boolean</property>
+                    <property name="allowExport">true</property>
+                </structure>
+                <structure>
+                    <property name="name">multi_grade_id</property>
+                    <expression name="expression" type="javascript">displayParam(params["multi_grade_id"].value)</expression>
+                    <property name="dataType">string</property>
+                    <property name="allowExport">true</property>
+                </structure>
+                <structure>
+                    <property name="name">multi_vendor_all</property>
+                    <expression name="expression" type="javascript">displayParam(params["multi_vendor_all"].value)</expression>
+                    <property name="dataType">boolean</property>
+                    <property name="allowExport">true</property>
+                </structure>
+                <structure>
+                    <property name="name">multi_vendor_id</property>
+                    <expression name="expression" type="javascript">displayParam(params["multi_vendor_id"].value)</expression>
+                    <property name="dataType">string</property>
+                    <property name="allowExport">true</property>
+                </structure>
+                <structure>
+                    <property name="name">multi_menu_cycle_all</property>
+                    <expression name="expression" type="javascript">displayParam(params["multi_menu_cycle_all"].value)</expression>
+                    <property name="dataType">boolean</property>
+                    <property name="allowExport">true</property>
+                </structure>
+                <structure>
+                    <property name="name">multi_menu_cycle_id</property>
+                    <expression name="expression" type="javascript">displayParam(params["multi_menu_cycle_id"].value)</expression>
+                    <property name="dataType">string</property>
+                    <property name="allowExport">true</property>
+                </structure>
+                <structure>
+                    <property name="name">start_date</property>
+                    <expression name="expression" type="javascript">displayParam(params["start_date"].value)</expression>
+                    <property name="dataType">date</property>
+                    <property name="allowExport">true</property>
+                </structure>
+                <structure>
+                    <property name="name">end_date</property>
+                    <expression name="expression" type="javascript">displayParam(params["end_date"].value)</expression>
+                    <property name="dataType">date</property>
+                    <property name="allowExport">true</property>
+                </structure>
+                <structure>
+                    <property name="name">ml_group_by_new</property>
+                    <expression name="expression" type="javascript">displayParam(params["ml_group_by_new"].value)</expression>
+                    <property name="dataType">string</property>
+                    <property name="allowExport">true</property>
+                </structure>
+                <structure>
+                    <property name="name">by_day</property>
+                    <expression name="expression" type="javascript">displayParam(params["by_day"].value)</expression>
+                    <property name="dataType">boolean</property>
+                    <property name="allowExport">true</property>
+                </structure>
+                <structure>
+                    <property name="name">ml_page_break</property>
+                    <expression name="expression" type="javascript">displayParam(params["ml_page_break"].value)</expression>
+                    <property name="dataType">string</property>
+                    <property name="allowExport">true</property>
+                </structure>
+                <structure>
+                    <property name="name">vendor_items_only</property>
+                    <expression name="expression" type="javascript">displayParam(params["vendor_items_only"].value)</expression>
+                    <property name="dataType">boolean</property>
+                    <property name="allowExport">true</property>
+                </structure>
+                <structure>
+                    <property name="name">include_student_name</property>
+                    <expression name="expression" type="javascript">displayParam(params["include_student_name"].value)</expression>
+                    <property name="dataType">boolean</property>
+                    <property name="allowExport">true</property>
+                </structure>
+                <structure>
+                    <property name="name">include_student_id</property>
+                    <expression name="expression" type="javascript">displayParam(params["include_student_id"].value)</expression>
+                    <property name="dataType">boolean</property>
+                    <property name="allowExport">true</property>
+                </structure>
+                <structure>
+                    <property name="name">include_school</property>
+                    <expression name="expression" type="javascript">displayParam(params["include_school"].value)</expression>
+                    <property name="dataType">boolean</property>
+                    <property name="allowExport">true</property>
+                </structure>
+                <structure>
+                    <property name="name">include_date</property>
+                    <expression name="expression" type="javascript">displayParam(params["include_date"].value)</expression>
+                    <property name="dataType">boolean</property>
+                    <property name="allowExport">true</property>
+                </structure>
+                <structure>
+                    <property name="name">include_room</property>
+                    <expression name="expression" type="javascript">displayParam(params["include_room"].value)</expression>
+                    <property name="dataType">boolean</property>
+                    <property name="allowExport">true</property>
+                </structure>
+                <structure>
+                    <property name="name">include_teacher</property>
+                    <expression name="expression" type="javascript">displayParam(params["include_teacher"].value)</expression>
+                    <property name="dataType">boolean</property>
+                    <property name="allowExport">true</property>
+                </structure>
+                <structure>
+                    <property name="name">include_grade</property>
+                    <expression name="expression" type="javascript">displayParam(params["include_grade"].value)</expression>
+                    <property name="dataType">boolean</property>
+                    <property name="allowExport">true</property>
+                </structure>
+                <structure>
+                    <property name="name">include_lunch_session</property>
+                    <expression name="expression" type="javascript">displayParam(params["include_lunch_session"].value)</expression>
+                    <property name="dataType">boolean</property>
+                    <property name="allowExport">true</property>
+                </structure>
+                <structure>
+                    <property name="name">include_item_name</property>
+                    <expression name="expression" type="javascript">displayParam(params["include_item_name"].value)</expression>
+                    <property name="dataType">boolean</property>
+                    <property name="allowExport">true</property>
+                </structure>
+                <structure>
+                    <property name="name">include_item_code</property>
+                    <expression name="expression" type="javascript">displayParam(params["include_item_code"].value)</expression>
+                    <property name="dataType">boolean</property>
+                    <property name="allowExport">true</property>
+                </structure>
+                <structure>
+                    <property name="name">include_bar_code</property>
+                    <expression name="expression" type="javascript">displayParam(params["include_bar_code"].value)</expression>
+                    <property name="dataType">boolean</property>
+                    <property name="allowExport">true</property>
+                </structure>
+                <structure>
+                    <property name="name">label_top_margin</property>
+                    <expression name="expression" type="javascript">displayParam(params["label_top_margin"].value)</expression>
+                    <property name="dataType">string</property>
+                    <property name="allowExport">true</property>
+                </structure>
+                <structure>
+                    <property name="name">label_vertical_pitch</property>
+                    <expression name="expression" type="javascript">displayParam(params["label_vertical_pitch"].value)</expression>
+                    <property name="dataType">string</property>
+                    <property name="allowExport">true</property>
+                </structure>
+                <structure>
+                    <property name="name">label_height</property>
+                    <expression name="expression" type="javascript">displayParam(params["label_height"].value)</expression>
+                    <property name="dataType">string</property>
+                    <property name="allowExport">true</property>
+                </structure>
+                <structure>
+                    <property name="name">label_left_margin</property>
+                    <expression name="expression" type="javascript">displayParam(params["label_left_margin"].value)</expression>
+                    <property name="dataType">string</property>
+                    <property name="allowExport">true</property>
+                </structure>
+                <structure>
+                    <property name="name">label_horizontal_pitch</property>
+                    <expression name="expression" type="javascript">displayParam(params["label_horizontal_pitch"].value)</expression>
+                    <property name="dataType">string</property>
+                    <property name="allowExport">true</property>
+                </structure>
+                <structure>
+                    <property name="name">label_width</property>
+                    <expression name="expression" type="javascript">displayParam(params["label_width"].value)</expression>
+                    <property name="dataType">string</property>
+                    <property name="allowExport">true</property>
+                </structure>
+                <structure>
+                    <property name="name">labels_across</property>
+                    <expression name="expression" type="javascript">displayParam(params["labels_across"].value)</expression>
+                    <property name="dataType">integer</property>
+                    <property name="allowExport">true</property>
+                </structure>
+                <structure>
+                    <property name="name">dev_debug</property>
+                    <expression name="expression" type="javascript">displayParam(params["dev_debug"].value)</expression>
+                    <property name="dataType">boolean</property>
+                    <property name="allowExport">true</property>
+                </structure>
+                <structure>
+                    <property name="name">dev_logfile</property>
+                    <expression name="expression" type="javascript">displayParam(params["dev_logfile"].value)</expression>
+                    <property name="dataType">string</property>
+                    <property name="allowExport">true</property>
+                </structure>
+            </list-property>
+            <column id="919"/>
+            <column id="920"/>
+            <column id="921"/>
+            <row id="922">
+                <cell id="923">
+                    <label id="934">
+                        <text-property name="text">dbname</text-property>
+                    </label>
+                </cell>
+                <cell id="924">
+                    <data id="935">
+                        <property name="resultSetColumn">dbname</property>
+                    </data>
+                </cell>
+                <cell id="925"/>
+            </row>
+            <row id="926">
+                <cell id="927">
+                    <label id="936">
+                        <text-property name="text">login_id</text-property>
+                    </label>
+                </cell>
+                <cell id="928">
+                    <data id="937">
+                        <property name="resultSetColumn">login_id</property>
+                    </data>
+                </cell>
+                <cell id="929"/>
+            </row>
+            <row id="938">
+                <cell id="939">
+                    <label id="940">
+                        <text-property name="text">multi_school_id</text-property>
+                    </label>
+                </cell>
+                <cell id="941">
+                    <data id="942">
+                        <property name="resultSetColumn">multi_school_id</property>
+                    </data>
+                </cell>
+                <cell id="943"/>
+            </row>
+            <row id="944">
+                <cell id="945">
+                    <label id="946">
+                        <text-property name="text">multi_room_all</text-property>
+                    </label>
+                </cell>
+                <cell id="947">
+                    <data id="948">
+                        <property name="resultSetColumn">multi_room_all</property>
+                    </data>
+                </cell>
+                <cell id="949"/>
+            </row>
+            <row id="950">
+                <cell id="951">
+                    <label id="952">
+                        <text-property name="text">multi_room_id</text-property>
+                    </label>
+                </cell>
+                <cell id="953">
+                    <data id="954">
+                        <property name="resultSetColumn">multi_room_id</property>
+                    </data>
+                </cell>
+                <cell id="955"/>
+            </row>
+            <row id="956">
+                <cell id="957">
+                    <label id="958">
+                        <text-property name="text">multi_teacher_all</text-property>
+                    </label>
+                </cell>
+                <cell id="959">
+                    <data id="960">
+                        <property name="resultSetColumn">multi_teacher_all</property>
+                    </data>
+                </cell>
+                <cell id="961"/>
+            </row>
+            <row id="962">
+                <cell id="963">
+                    <label id="964">
+                        <text-property name="text">multi_teacher_id</text-property>
+                    </label>
+                </cell>
+                <cell id="965">
+                    <data id="966">
+                        <property name="resultSetColumn">multi_teacher_id</property>
+                    </data>
+                </cell>
+                <cell id="967"/>
+            </row>
+            <row id="968">
+                <cell id="969">
+                    <label id="970">
+                        <text-property name="text">multi_lunch_session_all</text-property>
+                    </label>
+                </cell>
+                <cell id="971">
+                    <data id="972">
+                        <property name="resultSetColumn">multi_lunch_session_all</property>
+                    </data>
+                </cell>
+                <cell id="973"/>
+            </row>
+            <row id="974">
+                <cell id="975">
+                    <label id="976">
+                        <text-property name="text">multi_lunch_session_id</text-property>
+                    </label>
+                </cell>
+                <cell id="977">
+                    <data id="978">
+                        <property name="resultSetColumn">multi_lunch_session_id</property>
+                    </data>
+                </cell>
+                <cell id="979"/>
+            </row>
+            <row id="980">
+                <cell id="981">
+                    <label id="982">
+                        <text-property name="text">multi_grade_all</text-property>
+                    </label>
+                </cell>
+                <cell id="983">
+                    <data id="984">
+                        <property name="resultSetColumn">multi_grade_all</property>
+                    </data>
+                </cell>
+                <cell id="985"/>
+            </row>
+            <row id="986">
+                <cell id="987">
+                    <label id="988">
+                        <text-property name="text">multi_grade_id</text-property>
+                    </label>
+                </cell>
+                <cell id="989">
+                    <data id="990">
+                        <property name="resultSetColumn">multi_grade_id</property>
+                    </data>
+                </cell>
+                <cell id="991"/>
+            </row>
+            <row id="992">
+                <cell id="993">
+                    <label id="994">
+                        <text-property name="text">multi_vendor_all</text-property>
+                    </label>
+                </cell>
+                <cell id="995">
+                    <data id="996">
+                        <property name="resultSetColumn">multi_vendor_all</property>
+                    </data>
+                </cell>
+                <cell id="997"/>
+            </row>
+            <row id="998">
+                <cell id="999">
+                    <label id="1000">
+                        <text-property name="text">multi_vendor_id</text-property>
+                    </label>
+                </cell>
+                <cell id="1001">
+                    <data id="1002">
+                        <property name="resultSetColumn">multi_vendor_id</property>
+                    </data>
+                </cell>
+                <cell id="1003"/>
+            </row>
+            <row id="1004">
+                <cell id="1005">
+                    <label id="1006">
+                        <text-property name="text">multi_menu_cycle_all</text-property>
+                    </label>
+                </cell>
+                <cell id="1007">
+                    <data id="1008">
+                        <property name="resultSetColumn">multi_menu_cycle_all</property>
+                    </data>
+                </cell>
+                <cell id="1009"/>
+            </row>
+            <row id="1010">
+                <cell id="1011">
+                    <label id="1012">
+                        <text-property name="text">multi_menu_cycle_id</text-property>
+                    </label>
+                </cell>
+                <cell id="1013">
+                    <data id="1014">
+                        <property name="resultSetColumn">multi_menu_cycle_id</property>
+                    </data>
+                </cell>
+                <cell id="1015"/>
+            </row>
+            <row id="1016">
+                <cell id="1017">
+                    <label id="1018">
+                        <text-property name="text">start_date</text-property>
+                    </label>
+                </cell>
+                <cell id="1019">
+                    <data id="1020">
+                        <property name="resultSetColumn">start_date</property>
+                    </data>
+                </cell>
+                <cell id="1021"/>
+            </row>
+            <row id="1022">
+                <cell id="1023">
+                    <label id="1024">
+                        <text-property name="text">end_date</text-property>
+                    </label>
+                </cell>
+                <cell id="1025">
+                    <data id="1026">
+                        <property name="resultSetColumn">end_date</property>
+                    </data>
+                </cell>
+                <cell id="1027"/>
+            </row>
+            <row id="1028">
+                <cell id="1029">
+                    <label id="1030">
+                        <text-property name="text">ml_group_by_new</text-property>
+                    </label>
+                </cell>
+                <cell id="1031">
+                    <data id="1032">
+                        <property name="resultSetColumn">ml_group_by_new</property>
+                    </data>
+                </cell>
+                <cell id="1033"/>
+            </row>
+            <row id="1034">
+                <cell id="1035">
+                    <label id="1036">
+                        <text-property name="text">by_day</text-property>
+                    </label>
+                </cell>
+                <cell id="1037">
+                    <data id="1038">
+                        <property name="resultSetColumn">by_day</property>
+                    </data>
+                </cell>
+                <cell id="1039"/>
+            </row>
+            <row id="1040">
+                <cell id="1041">
+                    <label id="1042">
+                        <text-property name="text">ml_page_break</text-property>
+                    </label>
+                </cell>
+                <cell id="1043">
+                    <data id="1044">
+                        <property name="resultSetColumn">ml_page_break</property>
+                    </data>
+                </cell>
+                <cell id="1045"/>
+            </row>
+            <row id="1046">
+                <cell id="1047">
+                    <label id="1048">
+                        <text-property name="text">vendor_items_only</text-property>
+                    </label>
+                </cell>
+                <cell id="1049">
+                    <data id="1050">
+                        <property name="resultSetColumn">vendor_items_only</property>
+                    </data>
+                </cell>
+                <cell id="1051"/>
+            </row>
+            <row id="1052">
+                <cell id="1053">
+                    <label id="1054">
+                        <text-property name="text">include_student_name</text-property>
+                    </label>
+                </cell>
+                <cell id="1055">
+                    <data id="1056">
+                        <property name="resultSetColumn">include_student_name</property>
+                    </data>
+                </cell>
+                <cell id="1057"/>
+            </row>
+            <row id="1058">
+                <cell id="1059">
+                    <label id="1060">
+                        <text-property name="text">include_student_id</text-property>
+                    </label>
+                </cell>
+                <cell id="1061">
+                    <data id="1062">
+                        <property name="resultSetColumn">include_student_id</property>
+                    </data>
+                </cell>
+                <cell id="1063"/>
+            </row>
+            <row id="1064">
+                <cell id="1065">
+                    <label id="1066">
+                        <text-property name="text">include_school</text-property>
+                    </label>
+                </cell>
+                <cell id="1067">
+                    <data id="1068">
+                        <property name="resultSetColumn">include_school</property>
+                    </data>
+                </cell>
+                <cell id="1069"/>
+            </row>
+            <row id="1070">
+                <cell id="1071">
+                    <label id="1072">
+                        <text-property name="text">include_date</text-property>
+                    </label>
+                </cell>
+                <cell id="1073">
+                    <data id="1074">
+                        <property name="resultSetColumn">include_date</property>
+                    </data>
+                </cell>
+                <cell id="1075"/>
+            </row>
+            <row id="1076">
+                <cell id="1077">
+                    <label id="1078">
+                        <text-property name="text">include_room</text-property>
+                    </label>
+                </cell>
+                <cell id="1079">
+                    <data id="1080">
+                        <property name="resultSetColumn">include_room</property>
+                    </data>
+                </cell>
+                <cell id="1081"/>
+            </row>
+            <row id="1082">
+                <cell id="1083">
+                    <label id="1084">
+                        <text-property name="text">include_teacher</text-property>
+                    </label>
+                </cell>
+                <cell id="1085">
+                    <data id="1086">
+                        <property name="resultSetColumn">include_teacher</property>
+                    </data>
+                </cell>
+                <cell id="1087"/>
+            </row>
+            <row id="1088">
+                <cell id="1089">
+                    <label id="1090">
+                        <text-property name="text">include_grade</text-property>
+                    </label>
+                </cell>
+                <cell id="1091">
+                    <data id="1092">
+                        <property name="resultSetColumn">include_grade</property>
+                    </data>
+                </cell>
+                <cell id="1093"/>
+            </row>
+            <row id="1094">
+                <cell id="1095">
+                    <label id="1096">
+                        <text-property name="text">include_lunch_session</text-property>
+                    </label>
+                </cell>
+                <cell id="1097">
+                    <data id="1098">
+                        <property name="resultSetColumn">include_lunch_session</property>
+                    </data>
+                </cell>
+                <cell id="1099"/>
+            </row>
+            <row id="1100">
+                <cell id="1101">
+                    <label id="1102">
+                        <text-property name="text">include_item_name</text-property>
+                    </label>
+                </cell>
+                <cell id="1103">
+                    <data id="1104">
+                        <property name="resultSetColumn">include_item_name</property>
+                    </data>
+                </cell>
+                <cell id="1105"/>
+            </row>
+            <row id="1106">
+                <cell id="1107">
+                    <label id="1108">
+                        <text-property name="text">include_item_code</text-property>
+                    </label>
+                </cell>
+                <cell id="1109">
+                    <data id="1110">
+                        <property name="resultSetColumn">include_item_code</property>
+                    </data>
+                </cell>
+                <cell id="1111"/>
+            </row>
+            <row id="1112">
+                <cell id="1113">
+                    <label id="1114">
+                        <text-property name="text">include_bar_code</text-property>
+                    </label>
+                </cell>
+                <cell id="1115">
+                    <data id="1116">
+                        <property name="resultSetColumn">include_bar_code</property>
+                    </data>
+                </cell>
+                <cell id="1117"/>
+            </row>
+            <row id="1118">
+                <cell id="1119">
+                    <label id="1120">
+                        <text-property name="text">label_top_margin</text-property>
+                    </label>
+                </cell>
+                <cell id="1121">
+                    <data id="1122">
+                        <property name="resultSetColumn">label_top_margin</property>
+                    </data>
+                </cell>
+                <cell id="1123"/>
+            </row>
+            <row id="1124">
+                <cell id="1125">
+                    <label id="1126">
+                        <text-property name="text">label_vertical_pitch</text-property>
+                    </label>
+                </cell>
+                <cell id="1127">
+                    <data id="1128">
+                        <property name="resultSetColumn">label_vertical_pitch</property>
+                    </data>
+                </cell>
+                <cell id="1129"/>
+            </row>
+            <row id="1130">
+                <cell id="1131">
+                    <label id="1132">
+                        <text-property name="text">label_height</text-property>
+                    </label>
+                </cell>
+                <cell id="1133">
+                    <data id="1134">
+                        <property name="resultSetColumn">label_height</property>
+                    </data>
+                </cell>
+                <cell id="1135"/>
+            </row>
+            <row id="1136">
+                <cell id="1137">
+                    <label id="1138">
+                        <text-property name="text">label_left_margin</text-property>
+                    </label>
+                </cell>
+                <cell id="1139">
+                    <data id="1140">
+                        <property name="resultSetColumn">label_left_margin</property>
+                    </data>
+                </cell>
+                <cell id="1141"/>
+            </row>
+            <row id="1142">
+                <cell id="1143">
+                    <label id="1144">
+                        <text-property name="text">label_horizontal_pitch</text-property>
+                    </label>
+                </cell>
+                <cell id="1145">
+                    <data id="1146">
+                        <property name="resultSetColumn">label_horizontal_pitch</property>
+                    </data>
+                </cell>
+                <cell id="1147"/>
+            </row>
+            <row id="1148">
+                <cell id="1149">
+                    <label id="1150">
+                        <text-property name="text">label_width</text-property>
+                    </label>
+                </cell>
+                <cell id="1151">
+                    <data id="1152">
+                        <property name="resultSetColumn">label_width</property>
+                    </data>
+                </cell>
+                <cell id="1153"/>
+            </row>
+            <row id="1154">
+                <cell id="1155">
+                    <label id="1156">
+                        <text-property name="text">labels_across</text-property>
+                    </label>
+                </cell>
+                <cell id="1157">
+                    <data id="1158">
+                        <property name="resultSetColumn">labels_across</property>
+                    </data>
+                </cell>
+                <cell id="1159"/>
+            </row>
+            <row id="1160">
+                <cell id="1161">
+                    <label id="1162">
+                        <text-property name="text">dev_debug</text-property>
+                    </label>
+                </cell>
+                <cell id="1163">
+                    <data id="1164">
+                        <property name="resultSetColumn">dev_debug</property>
+                    </data>
+                </cell>
+                <cell id="1165"/>
+            </row>
+            <row id="1166">
+                <cell id="1167">
+                    <label id="1168">
+                        <text-property name="text">dev_logfile</text-property>
+                    </label>
+                </cell>
+                <cell id="1169">
+                    <data id="1170">
+                        <property name="resultSetColumn">dev_logfile</property>
+                    </data>
+                </cell>
+                <cell id="1171"/>
+            </row>
+        </grid>
+        <table id="619">
+            <property name="dataSet">Report</property>
+            <list-property name="boundDataColumns">
+                <structure>
+                    <property name="name">menu_date</property>
+                    <text-property name="displayName">menu_date</text-property>
+                    <expression name="expression" type="javascript">dataSetRow["menu_date"]</expression>
+                    <property name="dataType">date-time</property>
+                </structure>
+                <structure>
+                    <property name="name">student_first</property>
+                    <text-property name="displayName">student_first</text-property>
+                    <expression name="expression" type="javascript">dataSetRow["student_first"]</expression>
+                    <property name="dataType">string</property>
+                </structure>
+                <structure>
+                    <property name="name">student_last</property>
+                    <text-property name="displayName">student_last</text-property>
+                    <expression name="expression" type="javascript">dataSetRow["student_last"]</expression>
+                    <property name="dataType">string</property>
+                </structure>
+                <structure>
+                    <property name="name">student_id</property>
+                    <text-property name="displayName">student_id</text-property>
+                    <expression name="expression" type="javascript">dataSetRow["student_id"]</expression>
+                    <property name="dataType">integer</property>
+                </structure>
+                <structure>
+                    <property name="name">student_id_number</property>
+                    <text-property name="displayName">student_id_number</text-property>
+                    <expression name="expression" type="javascript">dataSetRow["student_id_number"]</expression>
+                    <property name="dataType">string</property>
+                </structure>
+                <structure>
+                    <property name="name">lunchsession</property>
+                    <text-property name="displayName">lunchsession</text-property>
+                    <expression name="expression" type="javascript">dataSetRow["lunchsession"]</expression>
+                    <property name="dataType">string</property>
+                </structure>
+                <structure>
+                    <property name="name">schoolname</property>
+                    <text-property name="displayName">schoolname</text-property>
+                    <expression name="expression" type="javascript">dataSetRow["schoolname"]</expression>
+                    <property name="dataType">string</property>
+                </structure>
+                <structure>
+                    <property name="name">roomname</property>
+                    <text-property name="displayName">roomname</text-property>
+                    <expression name="expression" type="javascript">dataSetRow["roomname"]</expression>
+                    <property name="dataType">string</property>
+                </structure>
+                <structure>
+                    <property name="name">roomnum</property>
+                    <text-property name="displayName">roomnum</text-property>
+                    <expression name="expression" type="javascript">dataSetRow["roomnum"]</expression>
+                    <property name="dataType">integer</property>
+                </structure>
+                <structure>
+                    <property name="name">teachername</property>
+                    <text-property name="displayName">teachername</text-property>
+                    <expression name="expression" type="javascript">dataSetRow["teachername"]</expression>
+                    <property name="dataType">string</property>
+                </structure>
+                <structure>
+                    <property name="name">gradename</property>
+                    <text-property name="displayName">gradename</text-property>
+                    <expression name="expression" type="javascript">dataSetRow["gradename"]</expression>
+                    <property name="dataType">string</property>
+                </structure>
+                <structure>
+                    <property name="name">translated_names</property>
+                    <text-property name="displayName">translated_names</text-property>
+                    <expression name="expression" type="javascript">dataSetRow["translated_names"]</expression>
+                    <property name="dataType">string</property>
+                </structure>
+                <structure>
+                    <property name="name">student_name</property>
+                    <expression name="expression" type="javascript">row["student_last"] + ", " + row["student_first"]</expression>
+                    <property name="dataType">string</property>
+                    <property name="allowExport">true</property>
+                </structure>
+                <structure>
+                    <property name="name">RTG</property>
+                    <expression name="expression" type="javascript">var result = [];
+if(params["include_room"].value) {
+	result.push(row["roomname"]);
+}
+if(params["include_teacher"].value) {
+	result.push(row["teachername"]);
+}
+if(params["include_grade"].value) {
+	result.push(row["gradename"]);
+}
+result.join(" / ");</expression>
+                    <property name="dataType">string</property>
+                    <property name="allowExport">true</property>
+                </structure>
+                <structure>
+                    <property name="name">col</property>
+                    <text-property name="displayName">col</text-property>
+                    <expression name="expression" type="javascript">dataSetRow["col"]</expression>
+                    <property name="dataType">integer</property>
+                </structure>
+                <structure>
+                    <property name="name">row</property>
+                    <text-property name="displayName">row</text-property>
+                    <expression name="expression" type="javascript">dataSetRow["row"]</expression>
+                    <property name="dataType">integer</property>
+                </structure>
+                <structure>
+                    <property name="name">agg_student_name</property>
+                    <property name="dataType">string</property>
+                    <simple-property-list name="aggregateOn">
+                        <value>RowGroup</value>
+                    </simple-property-list>
+                    <property name="aggregateFunction">MIN</property>
+                    <list-property name="arguments">
+                        <structure>
+                            <property name="name">Expression</property>
+                            <expression name="value" type="javascript">row["student_name"]</expression>
+                        </structure>
+                    </list-property>
+                    <expression name="filterExpr" type="javascript">row["col"] == 0</expression>
+                    <property name="allowExport">true</property>
+                </structure>
+                <structure>
+                    <property name="name">agg_student_id_number</property>
+                    <property name="dataType">string</property>
+                    <simple-property-list name="aggregateOn">
+                        <value>RowGroup</value>
+                    </simple-property-list>
+                    <property name="aggregateFunction">FIRST</property>
+                    <list-property name="arguments">
+                        <structure>
+                            <property name="name">Expression</property>
+                            <expression name="value" type="javascript">row["student_id_number"]</expression>
+                        </structure>
+                    </list-property>
+                    <expression name="filterExpr" type="javascript">row["col"] == 0</expression>
+                    <property name="allowExport">true</property>
+                </structure>
+                <structure>
+                    <property name="name">agg_school_name</property>
+                    <property name="dataType">string</property>
+                    <simple-property-list name="aggregateOn">
+                        <value>RowGroup</value>
+                    </simple-property-list>
+                    <property name="aggregateFunction">FIRST</property>
+                    <list-property name="arguments">
+                        <structure>
+                            <property name="name">Expression</property>
+                            <expression name="value" type="javascript">row["schoolname"]</expression>
+                        </structure>
+                    </list-property>
+                    <expression name="filterExpr" type="javascript">row["col"] == 0</expression>
+                    <property name="allowExport">true</property>
+                </structure>
+                <structure>
+                    <property name="name">agg_menu_date</property>
+                    <property name="dataType">date-time</property>
+                    <simple-property-list name="aggregateOn">
+                        <value>RowGroup</value>
+                    </simple-property-list>
+                    <property name="aggregateFunction">FIRST</property>
+                    <list-property name="arguments">
+                        <structure>
+                            <property name="name">Expression</property>
+                            <expression name="value" type="javascript">row["menu_date"]</expression>
+                        </structure>
+                    </list-property>
+                    <expression name="filterExpr" type="javascript">row["col"] == 0</expression>
+                    <property name="allowExport">true</property>
+                </structure>
+                <structure>
+                    <property name="name">agg_room_name</property>
+                    <property name="dataType">string</property>
+                    <simple-property-list name="aggregateOn">
+                        <value>RowGroup</value>
+                    </simple-property-list>
+                    <property name="aggregateFunction">FIRST</property>
+                    <list-property name="arguments">
+                        <structure>
+                            <property name="name">Expression</property>
+                            <expression name="value" type="javascript">row["roomname"]</expression>
+                        </structure>
+                    </list-property>
+                    <expression name="filterExpr" type="javascript">row["col"] == 0</expression>
+                    <property name="allowExport">true</property>
+                </structure>
+                <structure>
+                    <property name="name">agg_teacher_name</property>
+                    <property name="dataType">string</property>
+                    <simple-property-list name="aggregateOn">
+                        <value>RowGroup</value>
+                    </simple-property-list>
+                    <property name="aggregateFunction">FIRST</property>
+                    <list-property name="arguments">
+                        <structure>
+                            <property name="name">Expression</property>
+                            <expression name="value" type="javascript">row["teachername"]</expression>
+                        </structure>
+                    </list-property>
+                    <expression name="filterExpr" type="javascript">row["col"] == 0</expression>
+                    <property name="allowExport">true</property>
+                </structure>
+                <structure>
+                    <property name="name">agg_grade_name</property>
+                    <property name="dataType">string</property>
+                    <simple-property-list name="aggregateOn">
+                        <value>RowGroup</value>
+                    </simple-property-list>
+                    <property name="aggregateFunction">FIRST</property>
+                    <list-property name="arguments">
+                        <structure>
+                            <property name="name">Expression</property>
+                            <expression name="value" type="javascript">row["gradename"]</expression>
+                        </structure>
+                    </list-property>
+                    <expression name="filterExpr" type="javascript">row["col"] == 0</expression>
+                    <property name="allowExport">true</property>
+                </structure>
+                <structure>
+                    <property name="name">agg_item_name</property>
+                    <property name="dataType">string</property>
+                    <simple-property-list name="aggregateOn">
+                        <value>RowGroup</value>
+                    </simple-property-list>
+                    <property name="aggregateFunction">FIRST</property>
+                    <list-property name="arguments">
+                        <structure>
+                            <property name="name">Expression</property>
+                            <expression name="value" type="javascript">row["translated_names"]</expression>
+                        </structure>
+                    </list-property>
+                    <expression name="filterExpr" type="javascript">row["col"] == 0</expression>
+                    <property name="allowExport">true</property>
+                </structure>
+                <structure>
+                    <property name="name">agg_col</property>
+                    <property name="dataType">integer</property>
+                    <simple-property-list name="aggregateOn">
+                        <value>RowGroup</value>
+                    </simple-property-list>
+                    <property name="aggregateFunction">FIRST</property>
+                    <list-property name="arguments">
+                        <structure>
+                            <property name="name">Expression</property>
+                            <expression name="value" type="javascript">row["col"]</expression>
+                        </structure>
+                    </list-property>
+                    <expression name="filterExpr" type="javascript">row["col"] == 0</expression>
+                    <property name="allowExport">true</property>
+                </structure>
+                <structure>
+                    <property name="name">page</property>
+                    <expression name="expression" type="javascript">dataSetRow["page"]</expression>
+                    <property name="dataType">string</property>
+                    <property name="allowExport">true</property>
+                </structure>
+                <structure>
+                    <property name="name">page_1</property>
+                    <text-property name="displayName">page</text-property>
+                    <expression name="expression" type="javascript">dataSetRow["page"]</expression>
+                    <property name="dataType">integer</property>
+                </structure>
+                <structure>
+                    <property name="name">grouping_value</property>
+                    <text-property name="displayName">grouping_value</text-property>
+                    <expression name="expression" type="javascript">dataSetRow["grouping_value"]</expression>
+                    <property name="dataType">string</property>
+                </structure>
+                <structure>
+                    <property name="name">page_break_value</property>
+                    <text-property name="displayName">page_break_value</text-property>
+                    <expression name="expression" type="javascript">dataSetRow["page_break_value"]</expression>
+                    <property name="dataType">string</property>
+                </structure>
+                <structure>
+                    <property name="name">agg_lunchsession</property>
+                    <property name="dataType">string</property>
+                    <simple-property-list name="aggregateOn">
+                        <value>RowGroup</value>
+                    </simple-property-list>
+                    <property name="aggregateFunction">FIRST</property>
+                    <list-property name="arguments">
+                        <structure>
+                            <property name="name">Expression</property>
+                            <expression name="value" type="javascript">row["lunchsession"]</expression>
+                        </structure>
+                    </list-property>
+                    <expression name="filterExpr" type="javascript">row["col"] == 0</expression>
+                    <property name="allowExport">true</property>
+                </structure>
+                <structure>
+                    <property name="name">item_name</property>
+                    <expression name="expression" type="javascript">dataSetRow["item_name"]</expression>
+                    <property name="dataType">string</property>
+                    <property name="allowExport">true</property>
+                </structure>
+                <structure>
+                    <property name="name">markdown_names</property>
+                    <expression name="expression" type="javascript">dataSetRow["markdown_names"]</expression>
+                    <property name="dataType">string</property>
+                    <property name="allowExport">true</property>
+                </structure>
+            </list-property>
+            <method name="onPrepare"><![CDATA[this.name = "labels_table";
+var reportRunnable = reportContext.getReportRunnable();
+var engine = reportRunnable.getReportEngine();
+var dh = reportRunnable.getDesignHandle();
+var tableHandle = dh.findElement(this.name);
+// log("tableHandle class = " + tableHandle.getClass().getName());
+var layoutModel = tableHandle.getLayoutModel();
+// create new column bindings
+var colNames = [];
+var baseColBindings = [];
+var columnBindings = tableHandle.getColumnBindings();
+var columns = columnBindings.getListValue();
+iterate(columns, function(columnBinding) {
+	var filterExpr = columnBinding.getFilterExpression();
+	if(filterExpr == "row[\"col\"] == 0") {
+		colNames.push(columnBinding.getName());
+		baseColBindings.push(columnBinding);
+	}
+});
+for(var cbIndex = 0; cbIndex < baseColBindings.length; cbIndex++) {
+	var columnBinding = baseColBindings[cbIndex];
+	for(var colIndex = 1; colIndex < params["labels_across"].value; colIndex++) {
+		var newFilterExpr = "row[\"col\"] == " + colIndex;
+		// log("newFilterExpr = " + newFilterExpr);
+		var newName = columnBinding.getName() + "_" + colIndex;
+		// log("newName = " + newName);
+		var newColumnBinding = columnBinding.copy();
+		newColumnBinding.setFilterExpression(newFilterExpr);
+		newColumnBinding.setName(newName);
+		columnBindings.addItem(newColumnBinding);
+	}
+}
+var templateColumn = 1;
+// create the new columns
+for(var colIndex = 1; colIndex < params["labels_across"].value; colIndex++) {
+	var columnNumber = templateColumn + colIndex;
+	// log("copy column 1 to " + columnNumber);
+	var newColumnBandData = tableHandle.copyColumn(templateColumn);
+	tableHandle.insertAndPasteColumn(newColumnBandData, columnNumber - 1);
+}
+// set column widths
+for(var colIndex = 0; colIndex < params["labels_across"].value; colIndex++) {
+	var columnNumber = templateColumn + colIndex;
+	var columnHandle = tableHandle.findColumn(columnNumber);
+	// log("columnHandle class = " + columnHandle.getClass().getName());
+	columnHandle.setProperty("width", params["label_horizontal_pitch"].value);
+}
+// update the column headers and details
+var labelHeightDimension = getDimension(params["label_vertical_pitch"].value);
+var slot = tableHandle.HEADER_SLOT;
+var groupDEH = tableHandle.getGroups().get(1);
+log("groupDEH = " + groupDEH.getName());
+var groupHeaderSlot = groupDEH.getSlot(slot);
+var rowCount = groupHeaderSlot.getCount();
+// var rowCount = layoutModel.getRowCount();
+log("rowCount = " + rowCount);
+// provide for specified row heights and distribute the remaining height over any
+// rows that do not have specified heights
+var remainingHeight = labelHeightDimension.measure;
+log("remainingHeight = " + remainingHeight);
+var unspecifiedRows = [];
+var group = 2;
+for(var rowIndex = 0; rowIndex < rowCount; rowIndex++) {
+	var rowNumber = rowIndex + 1;
+	log("row = " + rowNumber);
+	var rowDEH = groupHeaderSlot.get(rowIndex);
+	var rowHeight = rowDEH.getProperty("height");
+	log("rowHeight = " + rowHeight);
+	if(rowHeight != null) {
+		var rowHeightDimension = getDimension(rowHeight + "");
+		var rh = convertDimension(rowHeightDimension, labelHeightDimension.units);
+		log("rh = " + rh);
+		remainingHeight -= rh;
+	}
+	else {
+		unspecifiedRows.push(rowDEH);
+	}
+	// modify controls in new cells
+	for(var colIndex = 1; colIndex < params["labels_across"].value; colIndex++) {
+		var columnNumber = colIndex + 1;
+		// log("col = " + columnNumber);
+		var cell = layoutModel.getCell(group, slot, rowNumber, columnNumber);
+		var itemHandles = cell.getContent().getContents();
+		iterate(itemHandles, function(item) {
+			log("item class = " + item.getClass().getName());
+			
+			if(item instanceof Packages.org.eclipse.birt.report.model.api.TextItemHandle) {
+				var content = item.getContent();
+				if(content != null) {
+					var newContent = content;
+					for(var cnIndex = 0; cnIndex < colNames.length; cnIndex++) {
+						var colName = colNames[cnIndex];
+						newContent = newContent.replace(colName, colName + "_" + colIndex);
+					}
+					if(content != newContent) {
+						// log("old content = " + content);
+						// log("new content = " + newContent);
+						item.setContent(newContent);
+					}
+				}
+			} else
+			if(item instanceof Packages.org.eclipse.birt.report.model.api.TextDataHandle) {
+				var expr = item.getValueExpr();
+				if(expr != null) {
+					var newExpr = expr;
+					for(var cnIndex = 0; cnIndex < colNames.length; cnIndex++) {
+						var colName = colNames[cnIndex];
+						newExpr = newExpr.replace(colName, colName + "_" + colIndex);
+					}
+					if(expr != newExpr) {
+						// log("old expr = " + expr);
+						// log("new expr = " + newExpr);
+						item.setValueExpr(newExpr);
+					}
+				}
+			} else
+			if(item instanceof Packages.org.eclipse.birt.report.model.api.ExtendedItemHandle) {
+				var expr = item.getExpressionProperty("data");
+				if(expr != null) {
+					log("ExtendedItemHandle = " + item.getClass().getName());
+					var exprString = expr.getExpression();
+					var newExprString = "var colIndex = " + colIndex + ";\n" + exprString;
+					for(var cnIndex = 0; cnIndex < colNames.length; cnIndex++) {
+						var colName = colNames[cnIndex];
+						newExprString = newExprString.replace(colName, colName + "_" + colIndex);
+					}				
+					if(exprString != newExprString) {
+						log("old expr = " + exprString);
+						log("new expr = " + newExprString);
+						var newExpr = new Packages.org.eclipse.birt.report.model.api.Expression(newExprString, expr.getType());
+						item.setExpressionProperty("data", newExpr);
+					}
+				}
+			}
+			var property = item.getProperty( "visibility" );
+			if(property != null) {
+				log("visibility property class = " + property.getClass().getName());
+				iterate(property, function(visItem) {
+					log("visItem class = " + visItem.getClass().getName());
+					var expr = visItem.getExpression() + "";
+					if(expr != null) {
+						log("expr = " + expr);
+						var newExpr = expr;
+						for(var cnIndex = 0; cnIndex < colNames.length; cnIndex++) {
+							var colName = colNames[cnIndex];
+							newExpr = newExpr.replace(colName, colName + "_" + colIndex);
+						}
+						if(expr != newExpr) {
+							log("colName = " + colName);
+							log("old expr = " + expr);
+							log("new expr = " + newExpr);
+							visItem.setExpression(newExpr);
+						}
+					}
+				});
+			}
+		});
+	}
+}
+// force the height on remaining rows
+if(unspecifiedRows.length > 0) {
+	log("remainingHeight = " + remainingHeight);
+	log("unspecifiedRows.length = " + unspecifiedRows.length);
+	var avgHeight = remainingHeight / unspecifiedRows.length;
+	log("avgHeight = " + avgHeight);
+	for(var rowIndex = 0; rowIndex < unspecifiedRows.length; rowIndex++) {
+		var rowDEH = unspecifiedRows[rowIndex];
+		rowDEH.setProperty("height", avgHeight + labelHeightDimension.units);
+	}
+}
+]]></method>
+            <column id="626"/>
+            <header>
+                <row id="889">
+                    <method name="onCreate"><![CDATA[labelCount = 0;]]></method>
+                    <list-property name="visibility">
+                        <structure>
+                            <property name="format">all</property>
+                            <expression name="valueExpr" type="javascript">row.__rownum >= 0</expression>
+                        </structure>
+                    </list-property>
+                    <cell id="890"/>
+                </row>
+            </header>
+            <group id="831">
+                <property name="groupName">PageGroup</property>
+                <expression name="keyExpr" type="javascript">row["page"]</expression>
+                <property name="hideDetail">false</property>
+                <property name="pageBreakBefore">always-excluding-first</property>
+            </group>
+            <group id="673">
+                <property name="groupName">RowGroup</property>
+                <expression name="keyExpr" type="javascript">row["row"]</expression>
+                <property name="hideDetail">false</property>
+                <header>
+                    <row id="796">
+                        <method name="onCreate"><![CDATA[log("row.onCreate");]]></method>
+                        <method name="onRender"><![CDATA[log("row.onRender");]]></method>
+                        <cell id="797">
+                            <method name="onPrepare"><![CDATA[if(params["dev_debug"].value) {
+	this.getStyle().backgroundColor = "#c0c000";
+}]]></method>
+                            <method name="onCreate"><![CDATA[log("cell.onCreate");
+]]></method>
+                            <method name="onRender"><![CDATA[log("cell.onRender");]]></method>
+                            <property name="paddingTop">0pt</property>
+                            <property name="paddingLeft">0pt</property>
+                            <property name="paddingBottom">0pt</property>
+                            <property name="paddingRight">0pt</property>
+                            <text id="798">
+                                <method name="onCreate"><![CDATA[log("text.onCreate");
+labelCount++;]]></method>
+                                <method name="onRender"><![CDATA[log("text.onRender");]]></method>
+                                <property name="contentType">html</property>
+                                <text-property name="content"><![CDATA[<VALUE-OF format="HTML">
+var result = [];
+var width = params["label_width"].value;
+var height = params["label_height"].value;
+
+if(params["include_bar_code"].value == true) {
+	var heightDimension = getDimension(height);
+	var h = convertDimension(heightDimension, "in");
+	height = (h - .4) + "in";
+}
+
+result.push("<div style=\"border: 0px solid red; overflow: hidden; height: ");
+result.push(height);
+result.push("; width: ");
+result.push(width);
+result.push("; \">");
+
+if(row["agg_col"] != null) {
+	if(params["include_student_name"].value || params["include_student_id"].value || params["include_date"].value) {
+		result.push("<table cellspacing=\"0\" cellpadding=\"0\" style=\"width: 100%; line-height: 10pt; font-size: 9pt; \"><tr>");
+
+		if(params["include_student_name"].value || params["include_student_id"].value) {
+			result.push("<td>");
+			if(params["include_student_name"].value) {
+				result.push("<span style=\"color: red; font-weight: bold; \">");
+				result.push(row["agg_student_name"] + "");
+				result.push("</span>");
+			}
+
+			if(params["include_student_id"].value) {
+				var studentId = row["agg_student_id_number"] + "";
+				// log("studentId = '" + studentId + "'");
+				if(studentId != null &amp;&amp; !isBlank(studentId)) {
+					result.push("<span style=\"font-size: 9pt; ");
+					if(params["include_student_name"].value)
+						result.push("padding-left: 1em; ");
+					result.push("\">");
+					result.push("(");
+					result.push(studentId);
+					result.push(")</span>");
+				}
+			}
+			result.push("</td>");
+		}
+		
+		if(params["include_date"].value) {
+			result.push("<td style=\"text-align: right; line-height: 9pt; font-size: 9pt; \">");
+			result.push(Formatter.format(row["agg_menu_date"], "MM/dd/yyyy"));
+			result.push("</td>");
+		}
+
+		result.push("</tr></table>");
+	}
+	result.push("<div style=\"line-height: 9pt; font-size: 9pt; \">");
+
+	if(params["include_school"].value) {
+		result.push(row["agg_school_name"] + "<br/>");
+	}
+
+	var rtg = [];
+	if(params["include_room"].value)
+		rtg.push(row["agg_room_name"]);
+	if(params["include_teacher"].value)
+		rtg.push(row["agg_teacher_name"]);
+	if(params["include_grade"].value)
+		rtg.push(row["agg_grade_name"]);
+
+	var rtgOrLs = false;
+	
+	if(rtg.length > 0) {
+		result.push(rtg.join(" / "));
+		rtgOrLs = true;
+	}
+
+	if(params["include_lunch_session"].value) {
+		if(rtgOrLs)
+			result.push(" / ");
+		result.push(row["agg_lunchsession"]);
+		rtgOrLs = true;
+	}
+	
+	if(rtgOrLs) {
+		result.push("<br/>");
+	}
+
+	if(params["include_item_code"].value || params["include_item_name"].value) {
+		result.push(row["agg_item_name"] + "<br/>");
+	}
+
+	result.push("</div>");
+}
+result.push("</div>");
+student_id_number = row["agg_student_id_number"];
+result.join("");
+</VALUE-OF>]]></text-property>
+                            </text>
+                            <extended-item extensionName="Barcode" id="800">
+                                <property name="barcodeType">5</property>
+                                <expression name="data">// label value
+var value = row["agg_student_id_number"];
+var col = row["agg_col"];
+var taskType = reportContext.getTaskType();
+log("*** barcode task type = " + taskType + ", col = " + col + ", value = " + value);
+taskType == 3 ? student_id_number : value
+</expression>
+                                <property name="textFontSize">8</property>
+                                <property name="textMargin">6.0</property>
+                                <method name="onCreate"><![CDATA[log("barcode.onCreate");]]></method>
+                                <method name="onRender"><![CDATA[log("barcode.onRender");]]></method>
+                                <property name="height">0.4in</property>
+                                <list-property name="visibility">
+                                    <structure>
+                                        <property name="format">all</property>
+                                        <expression name="valueExpr" type="javascript">!params["include_bar_code"].value || row["agg_student_id_number"] == null</expression>
+                                    </structure>
+                                </list-property>
+                            </extended-item>
+                        </cell>
+                    </row>
+                </header>
+            </group>
+            <detail>
+                <row id="837">
+                    <property name="backgroundColor">silver</property>
+                    <list-property name="visibility">
+                        <structure>
+                            <property name="format">all</property>
+                            <expression name="valueExpr" type="javascript">!params["dev_debug"].value</expression>
+                        </structure>
+                    </list-property>
+                    <cell id="838">
+                        <property name="borderBottomColor">#000000</property>
+                        <property name="borderBottomStyle">solid</property>
+                        <grid id="839">
+                            <column id="840"/>
+                            <column id="841"/>
+                            <row id="842">
+                                <cell id="843">
+                                    <label id="875">
+                                        <text-property name="text">col</text-property>
+                                    </label>
+                                </cell>
+                                <cell id="844">
+                                    <data id="685">
+                                        <property name="resultSetColumn">col</property>
+                                    </data>
+                                </cell>
+                            </row>
+                            <row id="845">
+                                <cell id="846">
+                                    <label id="876">
+                                        <text-property name="text">row</text-property>
+                                    </label>
+                                </cell>
+                                <cell id="847">
+                                    <data id="885">
+                                        <property name="resultSetColumn">row</property>
+                                    </data>
+                                </cell>
+                            </row>
+                            <row id="848">
+                                <cell id="849">
+                                    <label id="877">
+                                        <text-property name="text">page</text-property>
+                                    </label>
+                                </cell>
+                                <cell id="850">
+                                    <data id="886">
+                                        <property name="resultSetColumn">page</property>
+                                    </data>
+                                </cell>
+                            </row>
+                            <row id="851">
+                                <cell id="852">
+                                    <label id="878">
+                                        <text-property name="text">grouping_value</text-property>
+                                    </label>
+                                </cell>
+                                <cell id="853">
+                                    <data id="887">
+                                        <property name="resultSetColumn">grouping_value</property>
+                                    </data>
+                                </cell>
+                            </row>
+                            <row id="854">
+                                <cell id="855">
+                                    <label id="879">
+                                        <text-property name="text">page_break_value</text-property>
+                                    </label>
+                                </cell>
+                                <cell id="856">
+                                    <data id="888">
+                                        <property name="resultSetColumn">page_break_value</property>
+                                    </data>
+                                </cell>
+                            </row>
+                            <row id="857">
+                                <cell id="858">
+                                    <label id="880">
+                                        <text-property name="text">student_name</text-property>
+                                    </label>
+                                </cell>
+                                <cell id="859">
+                                    <data id="643">
+                                        <property name="resultSetColumn">student_name</property>
+                                    </data>
+                                </cell>
+                            </row>
+                            <row id="860">
+                                <cell id="861">
+                                    <label id="881">
+                                        <text-property name="text">school_name</text-property>
+                                    </label>
+                                </cell>
+                                <cell id="862">
+                                    <data id="644">
+                                        <property name="resultSetColumn">schoolname</property>
+                                    </data>
+                                </cell>
+                            </row>
+                            <row id="863">
+                                <cell id="864">
+                                    <label id="882">
+                                        <text-property name="text">menu_date</text-property>
+                                    </label>
+                                </cell>
+                                <cell id="865">
+                                    <data id="645">
+                                        <structure name="dateTimeFormat">
+                                            <property name="category">Custom</property>
+                                            <property name="pattern">MM/dd/yyyy</property>
+                                        </structure>
+                                        <property name="resultSetColumn">menu_date</property>
+                                    </data>
+                                </cell>
+                            </row>
+                            <row id="866">
+                                <cell id="867">
+                                    <label id="883">
+                                        <text-property name="text">RTG</text-property>
+                                    </label>
+                                </cell>
+                                <cell id="868">
+                                    <data id="652">
+                                        <property name="display">block</property>
+                                        <property name="resultSetColumn">RTG</property>
+                                    </data>
+                                </cell>
+                            </row>
+                            <row id="908">
+                                <cell id="909">
+                                    <label id="911">
+                                        <text-property name="text">item_name</text-property>
+                                    </label>
+                                </cell>
+                                <cell id="910">
+                                    <data id="912">
+                                        <property name="resultSetColumn">item_name</property>
+                                    </data>
+                                </cell>
+                            </row>
+                            <row id="913">
+                                <cell id="914">
+                                    <label id="916">
+                                        <text-property name="text">markdown_names</text-property>
+                                    </label>
+                                </cell>
+                                <cell id="915">
+                                    <data id="917">
+                                        <property name="resultSetColumn">markdown_names</property>
+                                    </data>
+                                </cell>
+                            </row>
+                            <row id="869">
+                                <cell id="870">
+                                    <label id="884">
+                                        <text-property name="text">translated_names</text-property>
+                                    </label>
+                                </cell>
+                                <cell id="871">
+                                    <data id="655">
+                                        <property name="resultSetColumn">translated_names</property>
+                                    </data>
+                                </cell>
+                            </row>
+                        </grid>
+                    </cell>
+                </row>
+            </detail>
+        </table>
+        <text id="907">
+            <property name="fontSize">12pt</property>
+            <property name="fontWeight">bold</property>
+            <property name="textAlign">center</property>
+            <property name="contentType">html</property>
+            <text-property name="content"><![CDATA[<VALUE-OF>labelCount == 0 ? "No &amp;nbsp;Results &amp;nbsp;Found &amp;nbsp;for &amp;nbsp;Selected &amp;nbsp;Criteria." : ""</VALUE-OF>]]></text-property>
+        </text>
+    </body>
+</report>
