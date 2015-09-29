@@ -1,3 +1,7 @@
 /.settings/
 /fud.xml
-/target/
+/target/bmr/
+/target/classes/
+/target/generated-sources/
+/target/maven-archiver/
+/target/test-classes/
