@@ -11,6 +11,7 @@ import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
@@ -113,7 +114,7 @@ public class BirtEngineResource {
 				return Long.MAX_VALUE;
 			}
 			// sort by end time
-			list.sort(new Comparator<FileInfo>() {
+			Collections.sort(list, new Comparator<FileInfo>() {
 				@Override
 				public int compare(final FileInfo o1, final FileInfo o2) {
 					if (o1.endTime < o2.endTime)
