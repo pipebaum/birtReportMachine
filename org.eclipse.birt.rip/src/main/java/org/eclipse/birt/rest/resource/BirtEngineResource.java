@@ -149,6 +149,7 @@ public class BirtEngineResource {
 	@Produces({ MediaType.APPLICATION_JSON })
 	public String uploadResource(@PathParam("name") final String name,
 			final java.io.Reader reader) throws IOException {
+		System.out.println("POST /upload/" + name);
 		final File resourceDir = ReportEngine.getResourceDir();
 		final File file = new File(resourceDir, name);
 		file.getParentFile().mkdirs();
@@ -177,6 +178,7 @@ public class BirtEngineResource {
 	@Consumes({ MediaType.APPLICATION_OCTET_STREAM })
 	@Produces({ MediaType.APPLICATION_JSON })
 	public String uploadReport(final java.io.Reader reader) throws IOException {
+		System.out.println("POST upload");
 		final UUID uuid = UUID.randomUUID();
 		ReportEngine.RESOURCE_DIR.mkdirs();
 		final File file = new File(ReportEngine.RESOURCE_DIR, uuid.toString());
@@ -271,6 +273,7 @@ public class BirtEngineResource {
 	@Produces({ MediaType.APPLICATION_OCTET_STREAM })
 	public StreamingOutput downloadReport(
 			@PathParam("fileId") final String fileIdString) {
+		System.out.println("GET /download/ " + fileIdString);
 		final File file = new File(ReportEngine.RESOURCE_DIR, fileIdString);
 		final FileInputStream fis;
 		try {
@@ -310,6 +313,8 @@ public class BirtEngineResource {
 			@PathParam("fileId") final String fileIdString,
 			@PathParam("parameterName") final String parameterName)
 			throws FileNotFoundException, BirtException {
+		System.out.println("GET /parameter/choices/" + fileIdString + "/"
+				+ parameterName);
 		final File file = new File(ReportEngine.RESOURCE_DIR, fileIdString);
 		final FileInputStream fis = new FileInputStream(file);
 		final IReportEngine reportEngine = ReportEngine.getReportEngine();
@@ -344,6 +349,7 @@ public class BirtEngineResource {
 	@Produces({ MediaType.APPLICATION_JSON })
 	public String getParameters(@PathParam("fileId") final String fileIdString)
 			throws IOException, BirtException {
+		System.out.println("GET /parameters/" + fileIdString);
 		final File file = new File(ReportEngine.RESOURCE_DIR, fileIdString);
 		final FileInputStream fis = new FileInputStream(file);
 		final IReportEngine reportEngine = ReportEngine.getReportEngine();
@@ -489,6 +495,8 @@ public class BirtEngineResource {
 	@Consumes({ MediaType.APPLICATION_JSON })
 	public Response runRptDoc(final String inputJsonString,
 			@PathParam("fileId") final String fileIdString) {
+		System.out.println("POST /run/rptdocument/" + fileIdString + ": "
+				+ inputJsonString);
 		final JSONObject paramsJsonObject = JSONObject
 				.fromObject(inputJsonString);
 		final File inputFile = new File(ReportEngine.RESOURCE_DIR, fileIdString);
@@ -521,17 +529,24 @@ public class BirtEngineResource {
 			}
 		}
 		catch (final ParameterValidationException e) {
+			System.out.println("Exception in /run/rptdocument/ " + fileIdString
+					+ ": " + e);
 			throw new NotAcceptableException(e.getMessage(), e);
 		}
 		catch (final FileNotFoundException e) {
+			System.out.println("Exception in /run/rptdocument/ " + fileIdString
+					+ ": " + e);
 			throw new NotFoundException(e.getMessage(), e);
 		}
 		catch (final BirtException e) {
+			System.out.println("Exception in /run/rptdocument/" + fileIdString
+					+ ": " + e);
 			throw new ServerErrorException(e.getMessage(), 500, e);
 		}
 		if (errors != null) {
 			for (final EngineException engineException : errors) {
-				System.out.println("ERROR:\t" + engineException.getMessage());
+				System.out.println("ERROR in /run/rptdocument/" + fileIdString
+						+ ": " + engineException.getMessage());
 			}
 			if (!errors.isEmpty())
 				throw new ServerErrorException(errors.size()
@@ -542,6 +557,8 @@ public class BirtEngineResource {
 			fis = new FileInputStream(outputFile);
 		}
 		catch (final FileNotFoundException e) {
+			System.out.println("Exception in /run/rptdocument/" + fileIdString
+					+ ": " + e);
 			throw new InternalServerErrorException(
 					"Unable to open generated rptdocument file", e);
 		}
@@ -582,6 +599,8 @@ public class BirtEngineResource {
 	public Response runReport(final String inputJsonString,
 			@PathParam("outputFormat") final String outputFormat,
 			@PathParam("fileId") final String fileIdString) {
+		System.out.println("POST /run/" + outputFormat + "/" + fileIdString
+				+ ": " + inputJsonString);
 		final JSONObject paramsJsonObject = JSONObject
 				.fromObject(inputJsonString);
 		final File file = new File(ReportEngine.RESOURCE_DIR, fileIdString);
