@@ -351,18 +351,24 @@ public class BirtEngineResource {
 			throws IOException, BirtException {
 		System.out.println("GET /parameters/" + fileIdString);
 		final File file = new File(ReportEngine.RESOURCE_DIR, fileIdString);
+		System.out.println("file: " + file.getAbsolutePath());
 		final FileInputStream fis = new FileInputStream(file);
 		final IReportEngine reportEngine = ReportEngine.getReportEngine();
+		System.out.println("reportEngine = " + reportEngine);
 		final IReportRunnable design = reportEngine.openReportDesign(fis);
+		System.out.println("reportDesign = " + design);
 		final IGetParameterDefinitionTask task = reportEngine
 				.createGetParameterDefinitionTask(design);
+		System.out.println("task = " + task);
 		try {
 			@SuppressWarnings("unchecked")
 			final Collection<Object> parameterDefns = task
 					.getParameterDefns(true);
 			final JSONArray jsonArray = new JSONArray();
 			for (final Object object : parameterDefns) {
+				System.out.println("parameterDefn = " + object);
 				if (!(object instanceof IScalarParameterDefn)) {
+					System.out.println("  unsupported");
 					// only support scalar parameters for now
 					continue;
 				}
@@ -475,6 +481,7 @@ public class BirtEngineResource {
 						parameterDefn.getScalarParameterType());
 				map.put("autoSuggestThreshold",
 						parameterDefn.getAutoSuggestThreshold());
+				System.out.println("map = " + map);
 				jsonArray.add(map);
 			}
 			// reset the timer
@@ -482,7 +489,12 @@ public class BirtEngineResource {
 					UUID.fromString(fileIdString),
 					Long.valueOf(System.currentTimeMillis()
 							+ ReportEngine.TIME_TO_LIVE));
+			System.out.println("returning " + jsonArray);
 			return jsonArray.toString();
+		}
+		catch (final Exception e) {
+			System.out.println("Exception: " + e);
+			throw e;
 		}
 		finally {
 			task.close();
